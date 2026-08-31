@@ -1,0 +1,46 @@
+# Gradle
+.gradle/
+build/
+*/build/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+local.properties
+
+# Android generated
+captures/
+.externalNativeBuild/
+.cxx/
+
+# APK / AAB outputs
+*.apk
+*.aab
+
+# Firebase / secrets
+google-services.json
+**/google-services.json
+.env
+.env.*
+*.env
+keystore.properties
+**/keystore.properties
+*.jks
+*.keystore
+*.p12
+
+# Logs
+*.log
+
+# Temporary / backup files
+*.backup*
+*_backup*
+.signing_restore/
+.signing_before_production/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# node modules
+functions/node_modules

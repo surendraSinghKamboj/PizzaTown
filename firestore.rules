@@ -1,0 +1,99 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Authorization is decided ONLY by the Firebase custom claim
+    // `admin: true`, set server-side via the Admin SDK / a Cloud
+    // Function. It cannot be forged from either Android app.
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // ---- users/{userId} : customer profiles ----
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ---- categories/{categoryId} : public read, admin write ----
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---- menuItems/{itemId} : public read, admin write ----
+    match /menuItems/{itemId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---- offers/{offerId} : public read, admin write ----
+    match /offers/{offerId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---- broadcasts/{broadcastId} : admin read/write ----
+    match /broadcasts/{broadcastId} {
+      allow read: if isSignedIn();
+    allow write: if isAdmin();
+    }
+
+    // ---- coupons/{couponId} : admin read/write ----
+    match /coupons/{couponId} {
+      allow read: if isSignedIn();
+    allow write: if isAdmin();
+    }
+
+
+    // ---- settings/{settingId} : signed-in read, admin write ----
+    // Customers need these documents for checkout/shop status.
+    // Admin manages restaurant status and delivery area.
+    match /settings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---- orders/{orderId} ----
+    // Customers can create their own orders and read their own orders.
+    // Only admins can read all orders or change order status.
+    //
+    // Payment integrity: a customer can create a COD order as
+    // NOT_REQUIRED, or an ONLINE order only as PENDING — never as PAID.
+    // The only things that can ever move an order to paymentStatus=PAID
+    // are the createCashfreeOrder / verifyCashfreePayment / cashfreeWebhook
+    // Cloud Functions, which use the Admin SDK and so bypass these rules
+    // entirely. Clients (including admins, via the update rule below) can
+    // never write paymentStatus, cashfreeOrderId, or cashfreePaymentId.
+    function isValidNewOrderPayment() {
+      let d = request.resource.data;
+      return (d.paymentMethod == 'COD' && d.paymentStatus == 'NOT_REQUIRED')
+        || (d.paymentMethod == 'ONLINE' && d.paymentStatus == 'PENDING');
+    }
+
+    match /orders/{orderId} {
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && isValidNewOrderPayment();
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      // Admin order-management can only change status/updatedAt — it can
+      // never rewrite the customer's items, prices, address, or payment
+      // fields after the fact. Payment fields are only ever written by the
+      // Cloud Functions above (which bypass rules via the Admin SDK).
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow delete: if isAdmin();
+    }
+  }
+}
