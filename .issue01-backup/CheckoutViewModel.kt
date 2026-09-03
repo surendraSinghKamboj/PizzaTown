@@ -508,13 +508,6 @@ class CheckoutViewModel @Inject constructor(
                 deliveryFee = deliveryFee
             )
             val paymentMethod = state.paymentMethod
-
-            // The selected saved address is the actual delivery destination.
-            // Current GPS is used above only to validate that checkout is
-            // happening inside the configured delivery radius.
-            val destinationLat = selectedAddress.latitude
-            val destinationLng = selectedAddress.longitude
-
             val order = Order(
                 userId = userId,
                 customer = OrderCustomer(state.name.trim(), state.phone.trim(), selectedAddress.fullAddress),
@@ -545,8 +538,8 @@ class CheckoutViewModel @Inject constructor(
                 } else {
                     OrderStatus.PENDING
                 },
-                deliveryLat = destinationLat,
-                deliveryLng = destinationLng,
+                deliveryLat = location.latitude,
+                deliveryLng = location.longitude,
                 paymentMethod = paymentMethod,
                 paymentStatus = if (paymentMethod == PaymentMethod.COD) PaymentStatus.NOT_REQUIRED else PaymentStatus.PENDING
             )

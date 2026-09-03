@@ -6,7 +6,6 @@ import com.pizzatown.delivery.presentation.home.DeliveryOrderSelection
 import com.pizzatown.delivery.presentation.home.DeliveryOrderDetailScreen
 import android.widget.Toast
 import com.pizzatown.delivery.core.location.DeliveryLocationService
-import com.pizzatown.delivery.core.notifications.DeliveryNotificationRegistrar
 
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,7 +34,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -46,7 +44,6 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -100,7 +97,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.HorizontalDivider
 import com.pizzatown.delivery.core.theme.DeliveryTheme
 import com.pizzatown.delivery.presentation.profile.ProfileScreen
@@ -115,31 +111,18 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.foundation.layout.ColumnScope
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.app.ActivityCompat
-import androidx.core.view.WindowCompat
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-
-        WindowCompat.getInsetsController(
-            window,
-            window.decorView
-        ).apply {
-            isAppearanceLightStatusBars = false
-            isAppearanceLightNavigationBars = false
-        }
-
-        window.statusBarColor = android.graphics.Color.TRANSPARENT
-        window.navigationBarColor = android.graphics.Color.TRANSPARENT
 
         val requiredPermissions =
             buildList {
@@ -196,31 +179,24 @@ class MainActivity : ComponentActivity() {
             DeliveryTheme(
                 darkTheme = darkTheme
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background)
-                        .statusBarsPadding()
-                ) {
-                    DeliveryRoot(
-                        appearance = runCatching {
-                            DeliveryAppearance.valueOf(appearance)
-                        }.getOrDefault(DeliveryAppearance.SYSTEM),
-                        onAppearanceChanged = { selected ->
-                            appearance = selected.name
+                DeliveryRoot(
+                    appearance = runCatching {
+                        DeliveryAppearance.valueOf(appearance)
+                    }.getOrDefault(DeliveryAppearance.SYSTEM),
+                    onAppearanceChanged = { selected ->
+                        appearance = selected.name
 
-                            getSharedPreferences(
-                                "delivery_preferences",
-                                MODE_PRIVATE
-                            ).edit()
-                                .putString(
-                                    "appearance",
-                                    selected.name
-                                )
-                                .apply()
-                        }
-                    )
-                }
+                        getSharedPreferences(
+                            "delivery_preferences",
+                            MODE_PRIVATE
+                        ).edit()
+                            .putString(
+                                "appearance",
+                                selected.name
+                            )
+                            .apply()
+                    }
+                )
             }
         }
     }
@@ -312,13 +288,6 @@ private fun DeliveryRoot(
             }
         )
         return
-    }
-
-    LaunchedEffect(currentUser?.uid) {
-        if (currentUser != null) {
-            DeliveryNotificationRegistrar().ensureChannel()
-            DeliveryNotificationRegistrar().registerCurrentToken()
-        }
     }
 
     var navigationOrderId by remember { mutableStateOf<String?>(null) }
@@ -439,12 +408,8 @@ private fun DeliveryRoot(
         navigationOrderId = navigationOrderId,
         onCloseNavigation = {
             navigationOrderId = null
-        },
-        onNavigate = { orderId ->
-            navigationOrderId = orderId
-            DeliveryOrderSelection.selectedOrderId = null
         }
-    )
+    , onNavigate = { })
 }
 
 @Composable
@@ -476,7 +441,6 @@ private fun DeliveryAppShell(
                 order = navigationOrder,
                 onBack = onCloseNavigation,
                 onCall = onCall,
-                onDirections = onDirections,
                 onDelivered = {
                     onDelivered(navigationOrder.orderId)
                 }
@@ -486,26 +450,35 @@ private fun DeliveryAppShell(
     }
 
     if (selectedDeliveryOrder != null) {
-        DeliveryOrderDetailScreen(
-            order = selectedDeliveryOrder,
-            onBack = {
-                DeliveryOrderSelection.selectedOrderId = null
-            },
-            onCall = onCall,
-            onPickUp = { orderId ->
-                onPickedUp(orderId)
-                DeliveryOrderSelection.selectedOrderId = null
-            },
-            onNavigate = { orderId ->
-                DeliveryOrderSelection.selectedOrderId = null
-                onNavigate(orderId)
-            },
-            onDelivered = { orderId ->
-                onDelivered(orderId)
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = {
                 DeliveryOrderSelection.selectedOrderId = null
             }
-        )
-        return
+        ) {
+            androidx.compose.material3.Surface(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                DeliveryOrderDetailScreen(
+                    order = selectedDeliveryOrder,
+                    onBack = {
+                        DeliveryOrderSelection.selectedOrderId = null
+                    },
+                    onCall = onCall,
+                    onPickUp = { orderId ->
+                        onPickedUp(orderId)
+                        DeliveryOrderSelection.selectedOrderId = null
+                    },
+                    onNavigate = { orderId ->
+                        DeliveryOrderSelection.selectedOrderId = null
+                        onNavigate(orderId)
+                    },
+                    onDelivered = { orderId ->
+                        onDelivered(orderId)
+                        DeliveryOrderSelection.selectedOrderId = null
+                    }
+                )
+            }
+        }
     }
 
 
@@ -715,10 +688,7 @@ private fun DeliveryAppShell(
 
     Scaffold(
         bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.background,
-                tonalElevation = 0.dp
-            ) {
+            NavigationBar {
                 NavigationBarItem(
                     selected = tab == 0,
                     onClick = {
@@ -727,19 +697,12 @@ private fun DeliveryAppShell(
                     icon = {
                         Icon(
                             Icons.Filled.Home,
-                            contentDescription = "Home"
+                            contentDescription = null
                         )
                     },
                     label = {
                         Text("Home")
-                    },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    }
                 )
 
                 NavigationBarItem(
@@ -750,19 +713,12 @@ private fun DeliveryAppShell(
                     icon = {
                         Icon(
                             Icons.Filled.History,
-                            contentDescription = "History"
+                            contentDescription = null
                         )
                     },
                     label = {
                         Text("History")
-                    },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    }
                 )
 
                 NavigationBarItem(
@@ -773,19 +729,12 @@ private fun DeliveryAppShell(
                     icon = {
                         Icon(
                             Icons.Filled.Person,
-                            contentDescription = "Profile"
+                            contentDescription = null
                         )
                     },
                     label = {
                         Text("Profile")
-                    },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    }
                 )
             }
         }
@@ -1525,6 +1474,15 @@ private fun DeliveryProfileHome(
                 Icons.Filled.DarkMode,
                 "Appearance",
                 "Choose System, Light or Dark",
+                onAppearance
+            )
+        }
+
+        item {
+            ToolRow(
+                Icons.Filled.Settings,
+                "App Settings",
+                "Delivery preferences and account controls",
                 onAppearance
             )
         }

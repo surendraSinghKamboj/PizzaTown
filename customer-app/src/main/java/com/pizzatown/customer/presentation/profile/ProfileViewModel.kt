@@ -165,21 +165,13 @@ class ProfileViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            val location = runCatching {
-                withContext(Dispatchers.IO) {
-                    locationProvider.getCurrentLocation()
-                }
-            }.getOrNull()
-
             val updated = current.addresses.map { address ->
                 if (address.id != addressId) {
                     address
                 } else {
                     address.copy(
                         label = label.trim().ifBlank { address.label },
-                        fullAddress = fullAddress.trim(),
-                        latitude = location?.latitude ?: address.latitude,
-                        longitude = location?.longitude ?: address.longitude
+                        fullAddress = fullAddress.trim()
                     )
                 }
             }

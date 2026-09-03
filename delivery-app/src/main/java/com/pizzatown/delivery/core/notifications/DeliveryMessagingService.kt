@@ -33,6 +33,10 @@ class DeliveryMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
 
+        // Make sure the channel exists even if the Activity has not
+        // recreated it yet.
+        DeliveryNotificationRegistrar().ensureChannel()
+
         val data = message.data
 
         val title =

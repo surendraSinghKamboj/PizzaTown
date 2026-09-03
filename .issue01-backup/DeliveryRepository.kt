@@ -23,15 +23,10 @@ class DeliveryRepository @Inject constructor(
     ): Flow<List<DeliveryOrder>> = callbackFlow {
 
         val ordersById = mutableMapOf<String, DeliveryOrder>()
-        val readyIds = mutableSetOf<String>()
-        val assignedIds = mutableSetOf<String>()
 
         fun emitOrders() {
             trySend(
                 ordersById.values
-                    .filter { order ->
-                        order.orderId in readyIds || order.orderId in assignedIds
-                    }
                     .sortedByDescending { it.orderId }
             )
         }
@@ -46,31 +41,26 @@ class DeliveryRepository @Inject constructor(
                     return@addSnapshotListener
                 }
 
-                val documents = snapshot?.documents.orEmpty()
-                val currentReadyIds = documents
-                    .map { it.id }
-                    .toSet()
+                Log.d(
+                    "DeliveryOrders",
+                    "READY listener: error=$error docs=${snapshot?.documents?.size ?: 0}"
+                )
 
-                // Remove orders that disappeared from READY.
-                readyIds
-                    .filter { it !in currentReadyIds }
-                    .toList()
-                    .forEach { orderId ->
-                        readyIds.remove(orderId)
+                snapshot?.documents.orEmpty().forEach { doc ->
+                    Log.d(
+                        "DeliveryOrders",
+                        "READY doc=${doc.id} status=${doc.getString("status")} deliveryBoyId=${doc.getString("deliveryBoyId")}"
+                    )
 
-                        // If it is not an assigned active order either,
-                        // remove it completely from the merged state.
-                        if (orderId !in assignedIds) {
-                            ordersById.remove(orderId)
-                        }
-                    }
-
-                documents.forEach { doc ->
                     doc.toDeliveryOrder()?.let { order ->
-                        readyIds.add(order.orderId)
                         ordersById[order.orderId] = order
                     }
                 }
+
+                Log.d(
+                    "DeliveryOrders",
+                    "READY merged orders=${ordersById.size}"
+                )
 
                 emitOrders()
             }
@@ -89,28 +79,8 @@ class DeliveryRepository @Inject constructor(
                     return@addSnapshotListener
                 }
 
-                val documents = snapshot?.documents.orEmpty()
-                val currentAssignedIds = documents
-                    .map { it.id }
-                    .toSet()
-
-                // THIS is the missing reconciliation:
-                // when ON_THE_WAY -> DELIVERED, the order disappears
-                // from this query, so remove it from the merged map.
-                assignedIds
-                    .filter { it !in currentAssignedIds }
-                    .toList()
-                    .forEach { orderId ->
-                        assignedIds.remove(orderId)
-
-                        if (orderId !in readyIds) {
-                            ordersById.remove(orderId)
-                        }
-                    }
-
-                documents.forEach { doc ->
+                snapshot?.documents.orEmpty().forEach { doc ->
                     doc.toDeliveryOrder()?.let { order ->
-                        assignedIds.add(order.orderId)
                         ordersById[order.orderId] = order
                     }
                 }

@@ -292,9 +292,9 @@ const STATUS_LABEL = {
 };
 
 /**
- * Sends a data-only FCM message to one user's saved token.
- * Data-only (no `notification` block) so the Android side always builds
- * the notification itself — see PizzaTownMessagingService.onMessageReceived.
+ * Sends a high-priority FCM notification + data message to one user's
+ * saved token. Foreground messages are handled by the Android messaging
+ * service; background messages can be displayed directly by Android.
  * Keys here MUST match NotificationConstants.kt on the client.
  */
 async function sendToUser(userId, title, body, extraData) {
@@ -308,7 +308,28 @@ async function sendToUser(userId, title, body, extraData) {
   try {
     await messaging.send({
       token,
-      data: { title, body, ...extraData },
+
+      notification: {
+        title,
+        body,
+      },
+
+      data: {
+        title,
+        body,
+        ...extraData,
+      },
+
+      android: {
+        priority: "high",
+
+        notification: {
+          channelId: "pizzatown_delivery_orders",
+          priority: "high",
+          defaultSound: true,
+          defaultVibrateTimings: true,
+        },
+      },
     });
   } catch (err) {
     logger.error(`Push to user ${userId} failed`, err);
@@ -744,8 +765,8 @@ exports.onOrderStatusChanged = onDocumentUpdated(
 
       const ridersSnapshot = await db
         .collection("users")
-        .whereEqualTo("role", "delivery")
-        .whereEqualTo("active", true)
+        .where("role", "==", "delivery")
+      .where("active", "==", true)
         .get();
 
       await Promise.all(

@@ -54,7 +54,6 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import androidx.compose.ui.viewinterop.AndroidView
-import android.graphics.drawable.ColorDrawable
 import kotlin.math.abs
 
 @Composable
@@ -63,7 +62,6 @@ fun DeliveryNavigationScreen(
     order: DeliveryOrder,
     onBack: () -> Unit,
     onCall: (String) -> Unit,
-    onDirections: (Double, Double) -> Unit,
     onDelivered: () -> Unit
 ) {
     val context = LocalContext.current
@@ -243,15 +241,12 @@ fun DeliveryNavigationScreen(
                 update = { map ->
                     map.overlays.removeAll { true }
 
-                    // CUSTOMER = saved delivery-address coordinates.
-                    // This must never be replaced by the rider's live GPS.
                     val destinationMarker = Marker(map).apply {
                         position = destination
-                        title = "Customer destination"
+                        title = "Customer"
                         snippet = order.customerAddress
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-
-                        // Keep the default map marker for the customer destination.
+                        icon = context.getDrawable(com.pizzatown.delivery.R.drawable.ic_launcher_foreground)
                     }
 
                     map.overlays.add(destinationMarker)
@@ -260,17 +255,11 @@ fun DeliveryNavigationScreen(
                     val riderLngValue = riderLng
 
                     if (riderLatValue != null && riderLngValue != null) {
-                        // RIDER = live GPS position of this delivery phone.
                         val riderMarker = Marker(map).apply {
                             position = GeoPoint(riderLatValue, riderLngValue)
-                            title = "Rider — You"
+                            title = "You"
                             snippet = "Live rider location"
                             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-
-                            // PizzaTown branded marker = rider's live location.
-                            icon = context.getDrawable(
-                                com.pizzatown.delivery.R.drawable.ic_launcher_foreground
-                            )
                         }
                         map.overlays.add(riderMarker)
                     }
@@ -284,19 +273,11 @@ fun DeliveryNavigationScreen(
                         map.overlays.add(polyline)
                     }
 
-                    // Keep both endpoints visible instead of centering only
-                    // on the rider. This makes a reversed/stale coordinate immediately
-                    // obvious during delivery QA.
-                    if (riderLatValue != null && riderLngValue != null) {
-                        val riderPoint = GeoPoint(riderLatValue, riderLngValue)
-                        val center = GeoPoint(
-                            (riderPoint.latitude + destination.latitude) / 2.0,
-                            (riderPoint.longitude + destination.longitude) / 2.0
-                        )
-                        map.controller.setCenter(center)
-                    } else {
-                        map.controller.setCenter(destination)
-                    }
+                    val centerPoint = riderLatValue?.let { lat ->
+                        riderLngValue?.let { lng -> GeoPoint(lat, lng) }
+                    } ?: destination
+
+                    map.controller.setCenter(centerPoint)
                     map.invalidate()
                 }
             )
@@ -339,15 +320,6 @@ fun DeliveryNavigationScreen(
 
                     Spacer(Modifier.height(8.dp))
 
-                    if (order.paymentMethod.equals("COD", true)) {
-                        Text(
-                            "Cash to collect: ₹${order.grandTotal.toInt()}",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-
-                        Spacer(Modifier.height(8.dp))
-                    }
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -372,32 +344,6 @@ fun DeliveryNavigationScreen(
                     }
 
                     Spacer(Modifier.height(10.dp))
-
-                    Button(
-                        onClick = {
-                            onDirections(
-                                order.deliveryLat,
-                                order.deliveryLng
-                            )
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        enabled =
-                            order.deliveryLat in -90.0..90.0 &&
-                            order.deliveryLng in -180.0..180.0 &&
-                            (order.deliveryLat != 0.0 || order.deliveryLng != 0.0)
-                    ) {
-                        Icon(
-                            Icons.Filled.Navigation,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.size(6.dp))
-                        Text("Get direction")
-                    }
-
-                    Spacer(Modifier.height(8.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),

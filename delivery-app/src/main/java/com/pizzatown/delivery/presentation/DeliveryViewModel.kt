@@ -190,6 +190,9 @@ class DeliveryViewModel @Inject constructor(
             runCatching {
                 repository.markDelivered(orderId)
             }.onSuccess {
+                _orders.value = _orders.value.filterNot {
+                    it.orderId == orderId
+                }
                 onSuccess()
             }.onFailure {
                 onFailure(

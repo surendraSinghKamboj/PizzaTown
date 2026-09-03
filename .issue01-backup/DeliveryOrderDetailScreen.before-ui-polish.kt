@@ -265,83 +265,18 @@ fun DeliveryOrderDetailScreen(
                             Spacer(Modifier.height(12.dp))
 
                             if (isCod) {
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer
-                                    ),
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        1.dp,
-                                        androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(
-                                            alpha = 0.35f
-                                        )
-                                    )
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(16.dp)
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(
-                                                Icons.Default.CheckCircle,
-                                                contentDescription = null,
-                                                tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
-                                            )
-
-                                            Spacer(Modifier.width(10.dp))
-
-                                            Text(
-                                                "CASH TO COLLECT",
-                                                style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
-                                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                                color = androidx.compose.material3.MaterialTheme.colorScheme.primary
-                                            )
-                                        }
-
-                                        Spacer(Modifier.height(8.dp))
-
-                                        Text(
-                                            "₹${order.grandTotal.toInt()}",
-                                            style = androidx.compose.material3.MaterialTheme.typography.headlineMedium,
-                                            fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
-                                            color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
-
-                                        Spacer(Modifier.height(4.dp))
-
-                                        Text(
-                                            "Collect this amount from the customer on delivery.",
-                                            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
-                                            color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
-                                    }
-                                }
+                                Text("Cash on Delivery")
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "Collect cash: ₹${order.grandTotal.toInt()}",
+                                    style = androidx.compose.material3.MaterialTheme.typography.titleLarge
+                                )
                             } else {
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
-                                    )
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(16.dp)
-                                    ) {
-                                        Text(
-                                            "PAID ONLINE",
-                                            style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
-                                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                            color = androidx.compose.material3.MaterialTheme.colorScheme.primary
-                                        )
-
-                                        Spacer(Modifier.height(4.dp))
-
-                                        Text(
-                                            "Payment completed online. No cash to collect.",
-                                            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium
-                                        )
-                                    }
-                                }
+                                Text("Paid online")
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    "Payment completed online. No cash to collect."
+                                )
                             }
                         }
                     }
