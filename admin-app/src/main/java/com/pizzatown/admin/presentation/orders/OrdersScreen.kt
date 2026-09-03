@@ -792,6 +792,12 @@ private fun StatusChip(status: OrderStatus) {
         OrderStatus.READY ->
             "Ready" to StatusReady
 
+        OrderStatus.ON_THE_WAY ->
+            "Out for delivery" to StatusConfirmed
+
+        OrderStatus.DELIVERED ->
+            "Delivered" to PizzaSuccess
+
         OrderStatus.COMPLETED ->
             "Completed" to PizzaSuccess
 

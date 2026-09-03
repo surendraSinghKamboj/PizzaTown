@@ -48,8 +48,7 @@ fun OrderDto.toDomain() = Order(
     items = items.map { OrderLineItem(it.menuItemId, it.name, it.variantName, it.customizationNames, it.quantity, it.unitPrice, it.lineTotal) },
     subtotal = subtotal, discount = discount, couponCode = couponCode, deliveryFee = deliveryFee, tax = tax, grandTotal = grandTotal,
     totalItems = totalItems, specialInstructions = specialInstructions,
-    status = runCatching { OrderStatus.valueOf(status) }
-        .getOrDefault(OrderStatus.PENDING),
+    status = runCatching { OrderStatus.valueOf(status) }.getOrDefault(OrderStatus.PENDING),
     createdAt = createdAt, updatedAt = updatedAt,
     deliveryLat = deliveryLat, deliveryLng = deliveryLng,
     paymentMethod = runCatching { PaymentMethod.valueOf(paymentMethod) }.getOrDefault(PaymentMethod.COD),

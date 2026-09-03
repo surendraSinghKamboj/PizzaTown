@@ -47,9 +47,19 @@ class DeliveryNotificationRegistrar {
                     .collection("users")
                     .document(uid)
                     .set(
-                        mapOf("fcmToken" to token),
+                        mapOf(
+                            "fcmToken" to token,
+                            "fcmTokenUpdatedAt" to System.currentTimeMillis()
+                        ),
                         SetOptions.merge()
                     )
+            }
+            .addOnFailureListener {
+                android.util.Log.e(
+                    "PizzaTownFCM",
+                    "Unable to obtain delivery FCM token",
+                    it
+                )
             }
     }
 }

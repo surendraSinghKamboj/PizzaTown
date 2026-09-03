@@ -512,6 +512,8 @@ private fun OrderStatusBadge(
         OrderStatus.CONFIRMED -> "Confirmed"
         OrderStatus.PREPARING -> "Preparing"
         OrderStatus.READY -> "Ready"
+        OrderStatus.ON_THE_WAY -> "Out for delivery"
+        OrderStatus.DELIVERED -> "Delivered"
         OrderStatus.COMPLETED -> "Completed"
         OrderStatus.CANCELLED -> "Cancelled"
     }
@@ -646,6 +648,12 @@ private fun orderStatusColor(
 
         OrderStatus.READY ->
             androidx.compose.ui.graphics.Color(0xFF26A69A)
+
+        OrderStatus.ON_THE_WAY ->
+            androidx.compose.ui.graphics.Color(0xFF42A5F5)
+
+        OrderStatus.DELIVERED ->
+            androidx.compose.ui.graphics.Color(0xFF4CAF50)
 
         OrderStatus.COMPLETED ->
             androidx.compose.ui.graphics.Color(0xFF4CAF50)

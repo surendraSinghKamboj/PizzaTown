@@ -46,7 +46,6 @@ fun CurrentOrderMiniBar(
     modifier: Modifier = Modifier
 ) {
     val activeOrders = orders.filter {
-        it.status != OrderStatus.DELIVERED &&
         it.status != OrderStatus.COMPLETED &&
         it.status != OrderStatus.CANCELLED
     }
@@ -220,8 +219,6 @@ private fun OrderStatus.displayName(): String =
         OrderStatus.CONFIRMED -> "Order Confirmed"
         OrderStatus.PREPARING -> "Preparing your order"
         OrderStatus.READY -> "Ready for delivery"
-        OrderStatus.ON_THE_WAY -> "Out for delivery"
-        OrderStatus.DELIVERED -> "Delivered"
         OrderStatus.COMPLETED -> "Completed"
         OrderStatus.CANCELLED -> "Cancelled"
     }

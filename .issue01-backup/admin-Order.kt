@@ -1,16 +1,6 @@
 package com.pizzatown.admin.domain.model
 
-enum class OrderStatus {
-    BEING_PAYMENT,
-    PENDING,
-    CONFIRMED,
-    PREPARING,
-    READY,
-    ON_THE_WAY,
-    DELIVERED,
-    COMPLETED, // legacy/historical status
-    CANCELLED
-}
+enum class OrderStatus { BEING_PAYMENT, PENDING, CONFIRMED, PREPARING, READY, COMPLETED, CANCELLED }
 
 enum class PaymentMethod { ONLINE, COD }
 
@@ -64,19 +54,10 @@ data class Order(
         OrderStatus.PENDING -> OrderStatus.CONFIRMED
         OrderStatus.CONFIRMED -> OrderStatus.PREPARING
         OrderStatus.PREPARING -> OrderStatus.READY
-        // READY means the kitchen has handed the order to the delivery workflow.
-        // Admin must not advance it to COMPLETED.
-        OrderStatus.READY -> null
-        OrderStatus.ON_THE_WAY -> null
-        OrderStatus.DELIVERED -> null
+        OrderStatus.READY -> OrderStatus.COMPLETED
         OrderStatus.COMPLETED -> null
         OrderStatus.CANCELLED -> null
     }
 
-    fun canCancel(): Boolean =
-        status != OrderStatus.READY &&
-        status != OrderStatus.ON_THE_WAY &&
-        status != OrderStatus.DELIVERED &&
-        status != OrderStatus.COMPLETED &&
-        status != OrderStatus.CANCELLED
+    fun canCancel(): Boolean = status != OrderStatus.COMPLETED && status != OrderStatus.CANCELLED
 }

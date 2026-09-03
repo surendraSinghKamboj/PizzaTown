@@ -1,16 +1,7 @@
 package com.pizzatown.customer.domain.model
 
-enum class OrderStatus {
-    BEING_PAYMENT,
-    PENDING,
-    CONFIRMED,
-    PREPARING,
-    READY,
-    ON_THE_WAY,
-    DELIVERED,
-    COMPLETED, // legacy/historical status
-    CANCELLED
-}
+enum class OrderStatus {    BEING_PAYMENT,
+ PENDING, CONFIRMED, PREPARING, READY, COMPLETED, CANCELLED }
 
 enum class PaymentMethod { ONLINE, COD }
 

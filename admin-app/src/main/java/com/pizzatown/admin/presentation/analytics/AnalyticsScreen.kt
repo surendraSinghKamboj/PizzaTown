@@ -1113,6 +1113,8 @@ private fun statusLabel(status: OrderStatus): String =
         OrderStatus.CONFIRMED -> "Confirmed"
         OrderStatus.PREPARING -> "Preparing"
         OrderStatus.READY -> "Ready"
+        OrderStatus.ON_THE_WAY -> "Out for delivery"
+        OrderStatus.DELIVERED -> "Delivered"
         OrderStatus.COMPLETED -> "Completed"
         OrderStatus.CANCELLED -> "Cancelled"
     }
@@ -1124,6 +1126,8 @@ private fun statusColor(status: OrderStatus): Color =
         OrderStatus.CONFIRMED -> StatusConfirmed
         OrderStatus.PREPARING -> StatusPreparing
         OrderStatus.READY -> StatusReady
+        OrderStatus.ON_THE_WAY -> StatusConfirmed
+        OrderStatus.DELIVERED -> PizzaSuccess
         OrderStatus.COMPLETED -> PizzaSuccess
         OrderStatus.CANCELLED -> StatusCancelled
     }
