@@ -14,6 +14,7 @@ import com.pizzatown.admin.presentation.coupons.CouponEditorScreen
 import com.pizzatown.admin.presentation.coupons.CouponsListScreen
 import com.pizzatown.admin.presentation.customers.UpcomingEventsScreen
 import com.pizzatown.admin.presentation.dashboard.DashboardScreen
+import com.pizzatown.admin.presentation.delivery.DeliveryPartnersScreen
 import com.pizzatown.admin.presentation.menu.MenuEditorScreen
 import com.pizzatown.admin.presentation.menu.MenuListScreen
 import com.pizzatown.admin.presentation.offers.OfferEditorScreen
@@ -210,5 +211,11 @@ fun AdminNavGraph(
                 onBack = { navController.popBackStack() }
             )
         }
+        composable(AdminDestinations.DELIVERY_PARTNERS) {
+            DeliveryPartnersScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
     }
 }

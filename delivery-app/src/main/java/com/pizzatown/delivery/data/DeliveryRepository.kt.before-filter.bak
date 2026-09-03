@@ -1,0 +1,155 @@
+package com.pizzatown.delivery.data
+
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.functions.FirebaseFunctions
+import com.pizzatown.delivery.domain.model.DeliveryOrder
+import com.pizzatown.delivery.domain.model.DeliveryOrderItem
+import javax.inject.Inject
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.tasks.await
+
+class DeliveryRepository @Inject constructor(
+    private val firestore: FirebaseFirestore,
+    private val functions: FirebaseFunctions
+) {
+
+    fun observeAssignedOrders(deliveryBoyId: String): Flow<List<DeliveryOrder>> =
+        callbackFlow {
+
+            val registration = firestore
+                .collection("orders")
+                .whereEqualTo("deliveryBoyId", deliveryBoyId)
+                .whereIn(
+                    "status",
+                    listOf("READY", "OUT_FOR_DELIVERY", "ON_THE_WAY")
+                )
+                .addSnapshotListener { snapshot, error ->
+
+                    if (error != null) {
+                        close(error)
+                        return@addSnapshotListener
+                    }
+
+                    val orders = snapshot?.documents.orEmpty().mapNotNull { doc ->
+
+                        val data = doc.data ?: return@mapNotNull null
+
+                        val items = (data["items"] as? List<*>)
+                            .orEmpty()
+                            .mapNotNull { raw ->
+                                val item = raw as? Map<*, *>
+                                    ?: return@mapNotNull null
+
+                                DeliveryOrderItem(
+                                    name = item["name"] as? String ?: "",
+                                    variantName = item["variantName"] as? String,
+                                    customizationNames =
+                                        (item["customizationNames"] as? List<*>)
+                                            ?.filterIsInstance<String>()
+                                            .orEmpty(),
+                                    quantity = (item["quantity"] as? Number)?.toInt() ?: 0,
+                                    unitPrice = (item["unitPrice"] as? Number)?.toDouble() ?: 0.0,
+                                    lineTotal = (item["lineTotal"] as? Number)?.toDouble() ?: 0.0
+                                )
+                            }
+
+                        DeliveryOrder(
+                            orderId = doc.id,
+                            customerName = data["customer"]?.let {
+                                (it as? Map<*, *>)?.get("name") as? String
+                            } ?: "",
+                            customerPhone = data["customer"]?.let {
+                                (it as? Map<*, *>)?.get("phone") as? String
+                            } ?: "",
+                            customerAddress = data["customer"]?.let {
+                                (it as? Map<*, *>)?.get("address") as? String
+                            } ?: "",
+                            deliveryLat = (data["deliveryLat"] as? Number)?.toDouble() ?: 0.0,
+                            deliveryLng = (data["deliveryLng"] as? Number)?.toDouble() ?: 0.0,
+                            items = items,
+                            subtotal = (data["subtotal"] as? Number)?.toDouble() ?: 0.0,
+                            deliveryFee = (data["deliveryFee"] as? Number)?.toDouble() ?: 0.0,
+                            grandTotal = (data["grandTotal"] as? Number)?.toDouble() ?: 0.0,
+                            paymentMethod = data["paymentMethod"] as? String ?: "COD",
+                            paymentStatus = data["paymentStatus"] as? String ?: "NOT_REQUIRED",
+                            status = data["status"] as? String ?: "READY",
+                            specialInstructions = data["specialInstructions"] as? String ?: ""
+                        )
+                    }
+
+                    trySend(orders)
+                }
+
+            awaitClose { registration.remove() }
+        }
+
+    fun observeDeliveredOrders(
+        deliveryBoyId: String
+    ): kotlinx.coroutines.flow.Flow<List<DeliveryOrder>> =
+        kotlinx.coroutines.flow.callbackFlow {
+            val registration = firestore
+                .collection("orders")
+                .whereEqualTo("deliveryBoyId", deliveryBoyId)
+                .whereEqualTo("status", "DELIVERED")
+                .addSnapshotListener { snapshot, error ->
+
+                    if (error != null) {
+                        close(error)
+                        return@addSnapshotListener
+                    }
+
+                    val result = snapshot?.documents.orEmpty().mapNotNull { doc ->
+                        val data = doc.data ?: return@mapNotNull null
+                        val customer = data["customer"] as? Map<*, *>
+
+                        DeliveryOrder(
+                            orderId = doc.id,
+                            customerName = customer?.get("name") as? String ?: "",
+                            customerPhone = customer?.get("phone") as? String ?: "",
+                            customerAddress = customer?.get("address") as? String ?: "",
+                            deliveryLat =
+                                (data["deliveryLat"] as? Number)?.toDouble() ?: 0.0,
+                            deliveryLng =
+                                (data["deliveryLng"] as? Number)?.toDouble() ?: 0.0,
+                            subtotal =
+                                (data["subtotal"] as? Number)?.toDouble() ?: 0.0,
+                            deliveryFee =
+                                (data["deliveryFee"] as? Number)?.toDouble() ?: 0.0,
+                            grandTotal =
+                                (data["grandTotal"] as? Number)?.toDouble() ?: 0.0,
+                            paymentMethod =
+                                data["paymentMethod"] as? String ?: "COD",
+                            paymentStatus =
+                                data["paymentStatus"] as? String ?: "NOT_REQUIRED",
+                            status =
+                                data["status"] as? String ?: "DELIVERED",
+                            specialInstructions =
+                                data["specialInstructions"] as? String ?: ""
+                        )
+                    }
+
+                    trySend(result)
+                }
+
+            awaitClose {
+                registration.remove()
+            }
+        }
+
+    suspend fun markPickedUp(orderId: String) {
+        functions
+            .getHttpsCallable("markOrderPickedUp")
+            .call(mapOf("orderId" to orderId))
+            .await()
+    }
+
+    suspend fun markDelivered(orderId: String) {
+        functions
+            .getHttpsCallable("markOrderDelivered")
+            .call(mapOf("orderId" to orderId))
+            .await()
+    }
+}

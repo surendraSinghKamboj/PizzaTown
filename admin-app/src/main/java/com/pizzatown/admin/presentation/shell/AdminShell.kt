@@ -3,6 +3,7 @@ package com.pizzatown.admin.presentation.shell
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.DirectionsBike
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -100,6 +101,17 @@ fun AdminShell(
                         onNavigate("orders")
                     }
                 )
+
+               DrawerItem(
+                   label = "Delivery Partners",
+                   icon = Icons.Filled.DirectionsBike,
+                   selected = currentRoute == "delivery_partners",
+                   onClick = {
+                       scope.launch { drawerState.close() }
+                       onNavigate("delivery_partners")
+                   }
+               )
+
 
                 DrawerItem(
                     label = "Analytics",

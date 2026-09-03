@@ -21,6 +21,7 @@ object AdminDestinations {
     const val COUPON_EDITOR = "coupon_editor"
     const val ANALYTICS = "analytics"
     const val SHOP_SETTINGS = "shop_settings"
+   const val DELIVERY_PARTNERS = "delivery_partners"
 
     const val PROFILE = "profile"
 

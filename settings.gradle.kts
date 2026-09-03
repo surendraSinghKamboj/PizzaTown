@@ -21,4 +21,5 @@ dependencyResolutionManagement {
 rootProject.name = "PizzaTown"
 
 include(":admin-app")
+include(":delivery-app")
 include(":customer-app")

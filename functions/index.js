@@ -1,3 +1,12 @@
+// DELIVERY STATUS CONSTANTS
+const DELIVERY_STATUS_READY = "READY";
+const DELIVERY_STATUS_OUT_FOR_DELIVERY = "OUT_FOR_DELIVERY";
+const DELIVERY_STATUS_DELIVERED = "DELIVERED";
+
+function isDeliveryRole(decodedToken) {
+  return decodedToken && decodedToken.role === "delivery";
+}
+
 /**
  * PizzaTown Cloud Functions
  * =========================
@@ -319,6 +328,208 @@ async function sendToTopic(topic, title, body, extraData) {
 }
 
 // ---- orders/{orderId}: notify admin the moment a customer places a new order ----
+
+// ---- DELIVERY PARTNER MANAGEMENT ----
+
+function requireAdmin(request) {
+  if (!request.auth || request.auth.token.admin !== true) {
+    throw new HttpsError(
+      "permission-denied",
+      "Only administrators can manage delivery partners."
+    );
+  }
+}
+
+exports.createDeliveryPartner = onCall(
+  { region: REGION },
+  async (request) => {
+    requireAdmin(request);
+
+    const data = request.data || {};
+
+    const name = String(data.name || "").trim();
+    const email = String(data.email || "").trim().toLowerCase();
+    let phone = String(data.phone || "").trim();
+    const password = String(data.password || "");
+
+    // Firebase Auth expects E.164 for phoneNumber.
+    // Make common Indian 10-digit numbers usable from the Admin UI.
+    if (/^\d{10}$/.test(phone)) {
+      phone = `+91${phone}`;
+    }
+
+    if (!name || !email || !phone || password.length < 6) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Name, email, phone and a password of at least 6 characters are required."
+      );
+    }
+
+    const userRecord = await require("firebase-admin/auth")
+      .getAuth()
+      .createUser({
+        email,
+        password,
+        displayName: name,
+        phoneNumber: phone
+      });
+
+    await require("firebase-admin/auth")
+      .getAuth()
+      .setCustomUserClaims(userRecord.uid, {
+        role: "delivery"
+      });
+
+    await db.collection("users").doc(userRecord.uid).set({
+      name,
+      email,
+      phone,
+      role: "delivery",
+      active: true,
+      createdAt: Date.now()
+    });
+
+    return {
+      uid: userRecord.uid
+    };
+  }
+);
+
+exports.updateDeliveryPartner = onCall(
+  { region: REGION },
+  async (request) => {
+    requireAdmin(request);
+
+    const data = request.data || {};
+
+    const uid = String(data.uid || "").trim();
+    const name = String(data.name || "").trim();
+    const email = String(data.email || "").trim().toLowerCase();
+    let phone = String(data.phone || "").trim();
+
+    phone = phone.replace(/[\s()-]/g, "");
+
+    if (/^0?\d{10}$/.test(phone)) {
+      phone = phone.replace(/^0/, "");
+      phone = `+91${phone}`;
+    }
+
+    if (!uid || !name || !email || !phone) {
+      throw new HttpsError(
+        "invalid-argument",
+        "UID, name, email and phone are required."
+      );
+    }
+
+    if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Enter a valid phone number."
+      );
+    }
+
+    const auth = require("firebase-admin/auth").getAuth();
+
+    await auth.updateUser(uid, {
+      displayName: name,
+      email,
+      phoneNumber: phone
+    });
+
+    await db.collection("users").doc(uid).set(
+      {
+        name,
+        email,
+        phone,
+        role: "delivery",
+        updatedAt: Date.now()
+      },
+      { merge: true }
+    );
+
+    return { success: true };
+  }
+);
+
+exports.resetDeliveryPartnerPassword = onCall(
+  { region: REGION },
+  async (request) => {
+    requireAdmin(request);
+
+    const data = request.data || {};
+    const uid = String(data.uid || "").trim();
+    const password = String(data.password || "");
+
+    if (!uid || password.length < 6) {
+      throw new HttpsError(
+        "invalid-argument",
+        "UID and a password of at least 6 characters are required."
+      );
+    }
+
+    await require("firebase-admin/auth")
+      .getAuth()
+      .updateUser(uid, { password });
+
+    return { success: true };
+  }
+);
+
+exports.deleteDeliveryPartner = onCall(
+  { region: REGION },
+  async (request) => {
+    requireAdmin(request);
+
+    const data = request.data || {};
+    const uid = String(data.uid || "").trim();
+
+    if (!uid) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Delivery partner UID is required."
+      );
+    }
+
+    const auth = require("firebase-admin/auth").getAuth();
+
+    await auth.deleteUser(uid);
+    await db.collection("users").doc(uid).delete();
+
+    return { success: true };
+  }
+);
+
+exports.setDeliveryPartnerActive = onCall(
+  { region: REGION },
+  async (request) => {
+    requireAdmin(request);
+
+    const data = request.data || {};
+    const uid = String(data.uid || "").trim();
+    const active = data.active === true;
+
+    if (!uid) {
+      throw new HttpsError("invalid-argument", "Delivery partner UID is required.");
+    }
+
+    const auth = require("firebase-admin/auth").getAuth();
+
+    await auth.updateUser(uid, {
+      disabled: !active
+    });
+
+    await db.collection("users").doc(uid).set(
+      {
+        active,
+        updatedAt: Date.now()
+      },
+      { merge: true }
+    );
+
+    return { success: true };
+  }
+);
+
 exports.onOrderCreated = onDocumentCreated(
   { document: "orders/{orderId}", region: REGION },
   async (event) => {
@@ -350,6 +561,20 @@ exports.onOrderCreated = onDocumentCreated(
     // moved — so their admin notification instead fires from
     // onOrderStatusChanged below, the moment paymentStatus actually becomes
     // PAID (via verifyCashfreePayment or the Cashfree webhook).
+    // Customer confirmation: every successfully created order gets an
+    // initial "received" notification. Status-change notifications below
+    // handle every later state transition.
+    await sendToUser(
+      order.userId,
+      "Order received",
+      `Your Pizza Town order has been received${amountSuffix ? ` — ${amountSuffix.replace(", ", "")}` : ""}.`,
+      {
+        type: "ORDER_STATUS",
+        orderId: event.params.orderId,
+        status: "PENDING"
+      }
+    );
+
     if (order.paymentMethod !== "ONLINE") {
       await sendToTopic(
         ADMIN_TOPIC,
@@ -363,12 +588,196 @@ exports.onOrderCreated = onDocumentCreated(
 
 // ---- orders/{orderId}: notify the customer whenever admin changes status,
 //      and notify admin the moment an ONLINE order is actually paid ----
+
+// ---- DELIVERY STATE TRANSITIONS ----
+// Delivery partners never update order status directly from the Android
+// client. These callable functions validate the authenticated delivery
+// partner, verify the order is READY/assigned correctly, and then perform
+// the status transition with the Admin SDK.
+
+exports.markOrderPickedUp = onCall(
+  { region: REGION },
+  async (request) => {
+    if (!request.auth || request.auth.token.role !== "delivery") {
+      throw new HttpsError(
+        "permission-denied",
+        "Only delivery partners can pick up orders."
+      );
+    }
+
+    const orderId = String(request.data?.orderId || "").trim();
+    if (!orderId) {
+      throw new HttpsError("invalid-argument", "Order ID is required.");
+    }
+
+    const uid = request.auth.uid;
+    const orderRef = db.collection("orders").doc(orderId);
+
+    return db.runTransaction(async (tx) => {
+      const snap = await tx.get(orderRef);
+
+      if (!snap.exists) {
+        throw new HttpsError("not-found", "Order not found.");
+      }
+
+      const order = snap.data() || {};
+      const currentStatus = String(order.status || "");
+
+      if (currentStatus !== "READY") {
+        throw new HttpsError(
+          "failed-precondition",
+          `Order is not ready for pickup. Current status: ${currentStatus || "UNKNOWN"}.`
+        );
+      }
+
+      const assignedTo = String(order.deliveryBoyId || "");
+
+      if (assignedTo && assignedTo !== uid) {
+        throw new HttpsError(
+          "already-exists",
+          "This order has already been picked up by another rider."
+        );
+      }
+
+      const now = FieldValue.serverTimestamp();
+
+      tx.update(orderRef, {
+        deliveryBoyId: uid,
+        status: "ON_THE_WAY",
+        pickedUpAt: now,
+        updatedAt: Date.now(),
+      });
+
+      return {
+        ok: true,
+        orderId,
+        status: "ON_THE_WAY",
+      };
+    });
+  }
+);
+
+exports.markOrderDelivered = onCall(
+  { region: REGION },
+  async (request) => {
+    if (!request.auth || request.auth.token.role !== "delivery") {
+      throw new HttpsError(
+        "permission-denied",
+        "Only delivery partners can complete deliveries."
+      );
+    }
+
+    const orderId = String(request.data?.orderId || "").trim();
+    if (!orderId) {
+      throw new HttpsError("invalid-argument", "Order ID is required.");
+    }
+
+    const uid = request.auth.uid;
+    const orderRef = db.collection("orders").doc(orderId);
+
+    return db.runTransaction(async (tx) => {
+      const snap = await tx.get(orderRef);
+
+      if (!snap.exists) {
+        throw new HttpsError("not-found", "Order not found.");
+      }
+
+      const order = snap.data() || {};
+      const currentStatus = String(order.status || "");
+      const assignedTo = String(order.deliveryBoyId || "");
+
+      if (assignedTo !== uid) {
+        throw new HttpsError(
+          "permission-denied",
+          "This order is not assigned to your delivery account."
+        );
+      }
+
+      if (currentStatus !== "ON_THE_WAY") {
+        throw new HttpsError(
+          "failed-precondition",
+          `Order cannot be delivered from status ${currentStatus || "UNKNOWN"}.`
+        );
+      }
+
+      tx.update(orderRef, {
+        status: "DELIVERED",
+        deliveredAt: FieldValue.serverTimestamp(),
+        updatedAt: Date.now(),
+      });
+
+      return {
+        ok: true,
+        orderId,
+        status: "DELIVERED",
+      };
+    });
+  }
+);
+
 exports.onOrderStatusChanged = onDocumentUpdated(
   { document: "orders/{orderId}", region: REGION },
   async (event) => {
     const before = event.data.before.data();
     const after = event.data.after.data();
     if (!before || !after) return;
+
+    // When an order becomes READY, notify every active delivery partner.
+    // If a specific deliveryBoyId is assigned, that rider is also notified
+    // through the same broadcast and therefore is not sent a duplicate.
+    const becameReady =
+      before.status !== "READY" && after.status === "READY";
+
+    if (becameReady) {
+      const customerName =
+        after.customer && after.customer.name
+          ? after.customer.name
+          : "Customer";
+
+      const amount =
+        typeof after.grandTotal === "number"
+          ? after.grandTotal.toFixed(2)
+          : "";
+
+      const riderMessage =
+        `${customerName}'s order is ready${amount ? ` — ₹${amount}` : ""}.`;
+
+      const ridersSnapshot = await db
+        .collection("users")
+        .whereEqualTo("role", "delivery")
+        .whereEqualTo("active", true)
+        .get();
+
+      await Promise.all(
+        ridersSnapshot.docs
+          .filter((doc) => doc.id !== after.deliveryBoyId)
+          .map((doc) =>
+            sendToUser(
+              doc.id,
+              "New ready order",
+              riderMessage,
+              {
+                type: "NEW_DELIVERY",
+                orderId: event.params.orderId
+              }
+            )
+          )
+      );
+
+      // Notify the specifically assigned rider as well.
+      if (after.deliveryBoyId) {
+        await sendToUser(
+          after.deliveryBoyId,
+          "New delivery assigned",
+          riderMessage,
+          {
+            type: "NEW_DELIVERY",
+            orderId: event.params.orderId
+          }
+        );
+      }
+    }
+
 
     if (before.status !== after.status) {
       const label = STATUS_LABEL[after.status] || String(after.status).toLowerCase();

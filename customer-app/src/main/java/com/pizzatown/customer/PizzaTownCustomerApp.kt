@@ -7,11 +7,10 @@ import javax.inject.Inject
 
 @HiltAndroidApp
 class PizzaTownCustomerApp : Application() {
-
     @Inject lateinit var notificationRegistrar: NotificationRegistrar
 
     override fun onCreate() {
         super.onCreate()
-        notificationRegistrar.ensureChannel()
+          notificationRegistrar.ensureChannel()
     }
 }

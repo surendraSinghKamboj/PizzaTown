@@ -201,6 +201,7 @@ private fun AdminRoot(
                     AdminDestinations.BROADCAST -> "Broadcast"
                     AdminDestinations.SHOP_SETTINGS -> "Shop Settings"
                     AdminDestinations.PROFILE -> "Profile"
+                    AdminDestinations.DELIVERY_PARTNERS -> "Delivery Partners"
                     else -> "Dashboard"
                 },
                 restaurantStatus = restaurantStatus,

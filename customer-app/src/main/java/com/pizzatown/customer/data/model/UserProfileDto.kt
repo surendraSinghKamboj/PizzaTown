@@ -7,6 +7,13 @@ data class AddressDto(
     val id: String = "",
     val label: String = "",
     val fullAddress: String = "",
+    val houseFlat: String = "",
+    val areaStreet: String = "",
+    val landmark: String = "",
+    val city: String = "",
+    val pincode: String = "",
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
     val isDefault: Boolean = false
 )
 
@@ -20,8 +27,32 @@ data class UserProfileDto(
     val anniversaryDate: Long = 0L
 )
 
-fun AddressDto.toDomain() = Address(id, label, fullAddress, isDefault)
-fun Address.toDto() = AddressDto(id, label, fullAddress, isDefault)
+fun AddressDto.toDomain() = Address(
+    id = id,
+    label = label,
+    fullAddress = fullAddress,
+    houseFlat = houseFlat,
+    areaStreet = areaStreet,
+    landmark = landmark,
+    city = city,
+    pincode = pincode,
+    latitude = latitude,
+    longitude = longitude,
+    isDefault = isDefault
+)
+fun Address.toDto() = AddressDto(
+    id = id,
+    label = label,
+    fullAddress = fullAddress,
+    houseFlat = houseFlat,
+    areaStreet = areaStreet,
+    landmark = landmark,
+    city = city,
+    pincode = pincode,
+    latitude = latitude,
+    longitude = longitude,
+    isDefault = isDefault
+)
 
 fun UserProfileDto.toDomain(userId: String) = UserProfile(
     userId = userId,

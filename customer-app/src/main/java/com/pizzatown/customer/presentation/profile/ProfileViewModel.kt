@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 data class ProfileEditState(
     val fullName: String = "",
     val mobile: String = "",
@@ -26,8 +28,8 @@ data class ProfileEditState(
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
-    private val authRepository: AuthRepository
-) : ViewModel() {
+    private val authRepository: AuthRepository,
+    private val locationProvider: com.pizzatown.customer.core.location.LocationProvider) : ViewModel() {
 
     private val userId = authRepository.currentUserId
 
@@ -109,23 +111,140 @@ class ProfileViewModel @Inject constructor(
 
     // ---- Address management ----
 
+    /**
+     * Backward-compatible address entry point used by the existing
+     * profile UI. New address flows should prefer addStructuredAddress().
+     */
     fun addAddress(label: String, fullAddress: String) {
-        val current = (_profileState.value as? UiState.Success)?.data ?: return
-        if (fullAddress.isBlank()) return
-        val newAddress = Address(
-            id = UUID.randomUUID().toString(),
-            label = label.ifBlank { "Address" },
-            fullAddress = fullAddress.trim(),
-            isDefault = current.addresses.isEmpty() // first address becomes default automatically
-        )
-        persistAddresses(current, current.addresses + newAddress)
+        val current =
+            (_profileState.value as? UiState.Success)?.data
+                ?: return
+
+        if (fullAddress.isBlank()) {
+            return
+        }
+
+        viewModelScope.launch {
+            val location = runCatching {
+                withContext(Dispatchers.IO) {
+                    locationProvider.getCurrentLocation()
+                }
+            }.getOrNull()
+
+            if (location == null) {
+                return@launch
+            }
+
+            val newAddress = Address(
+                id = java.util.UUID.randomUUID().toString(),
+                label = label.trim().ifBlank { "Home" },
+                fullAddress = fullAddress.trim(),
+                isDefault = current.addresses.isEmpty(),
+                latitude = location.latitude,
+                longitude = location.longitude
+            )
+
+            persistAddresses(
+                current,
+                current.addresses + newAddress
+            )
+        }
     }
 
-    fun updateAddress(addressId: String, label: String, fullAddress: String) {
-        val current = (_profileState.value as? UiState.Success)?.data ?: return
-        val updated = current.addresses.map {
-            if (it.id == addressId) it.copy(label = label.ifBlank { "Address" }, fullAddress = fullAddress.trim()) else it
+    fun updateAddress(
+        addressId: String,
+        label: String,
+        fullAddress: String
+    ) {
+        val current =
+            (_profileState.value as? UiState.Success)?.data
+                ?: return
+
+        if (fullAddress.isBlank()) {
+            return
         }
+
+        viewModelScope.launch {
+            val location = runCatching {
+                withContext(Dispatchers.IO) {
+                    locationProvider.getCurrentLocation()
+                }
+            }.getOrNull()
+
+            val updated = current.addresses.map { address ->
+                if (address.id != addressId) {
+                    address
+                } else {
+                    address.copy(
+                        label = label.trim().ifBlank { address.label },
+                        fullAddress = fullAddress.trim(),
+                        latitude = location?.latitude ?: address.latitude,
+                        longitude = location?.longitude ?: address.longitude
+                    )
+                }
+            }
+
+            persistAddresses(current, updated)
+        }
+    }
+
+    fun addStructuredAddress(address: Address) {
+        val current =
+            (_profileState.value as? UiState.Success)?.data
+                ?: return
+
+        if (
+            address.fullAddress.isBlank() ||
+            address.latitude !in -90.0..90.0 ||
+            address.longitude !in -180.0..180.0 ||
+            (address.latitude == 0.0 && address.longitude == 0.0)
+        ) {
+            return
+        }
+
+        val normalized = address.copy(
+            id = if (address.id.isBlank()) {
+                java.util.UUID.randomUUID().toString()
+            } else {
+                address.id
+            },
+            fullAddress = address.fullAddress.trim(),
+            label = address.label.trim().ifBlank { "Home" },
+            isDefault = current.addresses.isEmpty()
+        )
+
+        persistAddresses(
+            current,
+            current.addresses + normalized
+        )
+    }
+
+    fun updateStructuredAddress(address: Address) {
+        val current =
+            (_profileState.value as? UiState.Success)?.data
+                ?: return
+
+        if (
+            address.fullAddress.isBlank() ||
+            address.latitude !in -90.0..90.0 ||
+            address.longitude !in -180.0..180.0 ||
+            (address.latitude == 0.0 && address.longitude == 0.0)
+        ) {
+            return
+        }
+
+        val updated = current.addresses.map { existing ->
+            if (existing.id == address.id) {
+                address.copy(
+                    fullAddress = address.fullAddress.trim(),
+                    label = address.label.trim().ifBlank { existing.label },
+                    isDefault = existing.isDefault
+                )
+            } else {
+                existing
+            }
+        }
+
         persistAddresses(current, updated)
     }
 

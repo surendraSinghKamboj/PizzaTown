@@ -10,7 +10,18 @@ service cloud.firestore {
     // Authorization is decided ONLY by the Firebase custom claim
     // `admin: true`, set server-side via the Admin SDK / a Cloud
     // Function. It cannot be forged from either Android app.
-    function isAdmin() {
+    
+function isDelivery() {
+  return isSignedIn() &&
+    request.auth.token.role == "delivery";
+}
+
+function isAssignedDeliveryBoy(orderData) {
+  return isDelivery() &&
+    orderData.deliveryBoyId == request.auth.uid;
+}
+
+function isAdmin() {
       return isSignedIn() && request.auth.token.admin == true;
     }
 
@@ -19,7 +30,8 @@ service cloud.firestore {
     }
 
     // ---- users/{userId} : customer profiles ----
-    match /users/{userId} {
+    // Delivery partner profiles are managed by admins and read by the delivery app only for its own profile.
+   match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId);
       allow update: if isOwner(userId) || isAdmin();
@@ -86,7 +98,14 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
         && isValidNewOrderPayment();
-      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.userId == request.auth.uid)
+        // Any signed-in delivery rider may see READY orders so that
+        // available jobs can be claimed by the first rider who picks up.
+        || (isDelivery() && resource.data.status == 'READY')
+        // Once picked up, only the assigned rider may continue reading
+        // the active delivery.
+        || isAssignedDeliveryBoy(resource.data);
       // Admin order-management can only change status/updatedAt — it can
       // never rewrite the customer's items, prices, address, or payment
       // fields after the fact. Payment fields are only ever written by the

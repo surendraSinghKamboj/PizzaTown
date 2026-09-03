@@ -34,20 +34,51 @@ import com.pizzatown.customer.presentation.components.ErrorView
 import com.pizzatown.customer.presentation.components.LoadingView
 import com.pizzatown.customer.presentation.settings.ThemeSettingRow
 
+import com.pizzatown.customer.presentation.address.AddressManagerScreen
 @Composable
 fun ProfileScreen(
     onLoggedOut: () -> Unit,
     onViewOrders: () -> Unit,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
+    var showAddressManager by remember {
+        mutableStateOf(false)
+    }
+
+    var editingAddress by remember {
+        mutableStateOf<com.pizzatown.customer.domain.model.Address?>(null)
+    }
+
+
+
+
+    if (showAddressManager) {
+        AddressManagerScreen(
+            existing = editingAddress,
+            onBack = {
+                showAddressManager = false
+                editingAddress = null
+            },
+            onSave = { address ->
+                if (editingAddress == null) {
+                    viewModel.addStructuredAddress(address)
+                } else {
+                    viewModel.updateStructuredAddress(address)
+                }
+
+                showAddressManager = false
+                editingAddress = null
+            }
+        )
+        return
+    }
     val profileState by viewModel.profileState.collectAsStateWithLifecycle()
     val editState by viewModel.editState.collectAsStateWithLifecycle()
     val saving by viewModel.saveInProgress.collectAsStateWithLifecycle()
     val saveSuccess by viewModel.saveSuccess.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    var showAddressDialog by remember { mutableStateOf(false) }
-    var editingAddress by remember { mutableStateOf<Address?>(null) }
+    
 
     LaunchedEffect(saveSuccess) {
         if (saveSuccess) {
@@ -216,7 +247,7 @@ fun ProfileScreen(
                         Button(
                             onClick = {
                                 editingAddress = null
-                                showAddressDialog = true
+                                showAddressManager = true
                             },
                             shape = RoundedCornerShape(13.dp),
                             contentPadding = PaddingValues(
@@ -244,7 +275,7 @@ fun ProfileScreen(
                             AddressRow(
                                 address = address,
                                 onSetDefault = { viewModel.setDefaultAddress(address.id) },
-                                onEdit = { editingAddress = address; showAddressDialog = true },
+                                onEdit = { editingAddress = address; showAddressManager = true },
                                 onDelete = { viewModel.deleteAddress(address.id) }
                             )
                             Spacer(Modifier.height(8.dp))
@@ -272,18 +303,7 @@ fun ProfileScreen(
         }
     }
 
-    if (showAddressDialog) {
-        AddressDialog(
-            initial = editingAddress,
-            onDismiss = { showAddressDialog = false },
-            onConfirm = { label, text ->
-                val existing = editingAddress
-                if (existing != null) viewModel.updateAddress(existing.id, label, text)
-                else viewModel.addAddress(label, text)
-                showAddressDialog = false
-            }
-        )
-    }
+    
 }
 
 @Composable
@@ -447,143 +467,3 @@ private fun AddressRow(
         }
     }
 }
-
-@Composable
-private fun AddressDialog(
-    initial: Address?,
-    onDismiss: () -> Unit,
-    onConfirm: (label: String, text: String) -> Unit
-) {
-    var label by remember {
-        mutableStateOf(initial?.label ?: "Home")
-    }
-
-    var text by remember {
-        mutableStateOf(initial?.fullAddress ?: "")
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-
-        shape = RoundedCornerShape(24.dp),
-
-        title = {
-            Column {
-                Text(
-                    if (initial == null)
-                        "Add New Address"
-                    else
-                        "Edit Address",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(Modifier.height(4.dp))
-
-                Text(
-                    if (initial == null)
-                        "Save an address for faster checkout."
-                    else
-                        "Update your saved delivery address.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-
-        text = {
-            Column {
-                Text(
-                    "Address type",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Spacer(Modifier.height(9.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(7.dp)
-                ) {
-                    listOf(
-                        "Home" to Icons.Filled.Home,
-                        "Work" to Icons.Filled.Work,
-                        "Other" to Icons.Filled.LocationOn
-                    ).forEach { (option, icon) ->
-
-                        val selected = label == option
-
-                        FilterChip(
-                            selected = selected,
-                            onClick = {
-                                label = option
-                            },
-                            label = {
-                                Text(option)
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    icon,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(17.dp)
-                                )
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = {
-                        text = it
-                    },
-                    label = {
-                        Text("Full address")
-                    },
-                    placeholder = {
-                        Text("House no., street, area, city...")
-                    },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Filled.LocationOn,
-                            contentDescription = null
-                        )
-                    },
-                    minLines = 4,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp)
-                )
-            }
-        },
-
-        confirmButton = {
-            Button(
-                onClick = {
-                    onConfirm(
-                        label,
-                        text.trim()
-                    )
-                },
-                enabled = text.isNotBlank(),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Text(
-                    if (initial == null) "Save Address" else "Save Changes",
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        },
-
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss
-            ) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-

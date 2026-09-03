@@ -1,0 +1,113 @@
+package com.pizzatown.delivery.presentation
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
+import com.pizzatown.delivery.data.DeliveryRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+
+@HiltViewModel
+class DeliveryViewModel @Inject constructor(
+    private val auth: FirebaseAuth,
+    private val repository: DeliveryRepository
+) : ViewModel() {
+
+    private val _orders = MutableStateFlow(emptyList<com.pizzatown.delivery.domain.model.DeliveryOrder>())
+    val orders: StateFlow<List<com.pizzatown.delivery.domain.model.DeliveryOrder>> = _orders
+
+    private val _history =
+        MutableStateFlow(
+            emptyList<com.pizzatown.delivery.domain.model.DeliveryOrder>()
+        )
+
+    val history:
+        StateFlow<List<com.pizzatown.delivery.domain.model.DeliveryOrder>> =
+        _history
+
+    private val _loginError = MutableStateFlow<String?>(null)
+    val loginError: StateFlow<String?> = _loginError
+
+    fun login(email: String, password: String, onSuccess: () -> Unit) {
+
+        if (email.isBlank() || password.isBlank()) {
+            _loginError.value = "Enter email and password."
+            return
+        }
+
+        auth.signInWithEmailAndPassword(email.trim(), password)
+            .addOnSuccessListener {
+
+                val user = auth.currentUser
+
+                user?.getIdToken(true)?.addOnSuccessListener { result ->
+
+                    val role = result.claims["role"] as? String
+
+                    if (role != "delivery") {
+                        auth.signOut()
+                        _loginError.value = "This account is not a delivery account."
+                    } else {
+                        observeOrders(user.uid)
+                        onSuccess()
+                    }
+                }
+            }
+            .addOnFailureListener {
+                _loginError.value = it.message ?: "Login failed."
+            }
+    }
+
+    private fun observeOrders(uid: String) {
+        viewModelScope.launch {
+            repository.observeAssignedOrders(uid)
+                .collect { _orders.value = it }
+        }
+
+        viewModelScope.launch {
+            repository.observeDeliveredOrders(uid)
+                .collect { _history.value = it }
+        }
+    }
+
+    fun markPickedUp(
+        orderId: String,
+        onSuccess: () -> Unit = {},
+        onFailure: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                repository.markPickedUp(orderId)
+            }.onSuccess {
+                onSuccess()
+            }.onFailure {
+                onFailure(it.message ?: "Unable to pick up order.")
+            }
+        }
+    }
+
+    fun markDelivered(
+        orderId: String,
+        onSuccess: () -> Unit = {},
+        onFailure: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                repository.markDelivered(orderId)
+            }.onSuccess {
+                onSuccess()
+            }.onFailure {
+                onFailure(it.message ?: "Unable to mark order delivered.")
+            }
+        }
+    }
+
+    fun logout() {
+        auth.signOut()
+        _orders.value = emptyList()
+        _history.value = emptyList()
+    }
+}
