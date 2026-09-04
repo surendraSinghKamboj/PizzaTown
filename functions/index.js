@@ -695,9 +695,11 @@ exports.markOrderDelivered = onCall(
 
     const uid = request.auth.uid;
     const orderRef = db.collection("orders").doc(orderId);
+    const riderRef = db.collection("users").doc(uid);
 
     return db.runTransaction(async (tx) => {
       const snap = await tx.get(orderRef);
+      const riderSnap = await tx.get(riderRef);
 
       if (!snap.exists) {
         throw new HttpsError("not-found", "Order not found.");
@@ -721,9 +723,20 @@ exports.markOrderDelivered = onCall(
         );
       }
 
+      const rider = riderSnap.exists ? (riderSnap.data() || {}) : {};
+
+      const deliveredByName =
+        String(rider.fullName || "").trim() ||
+        String(rider.name || "").trim() ||
+        String(request.auth.token.name || "").trim() ||
+        String(request.auth.token.email || "").trim() ||
+        "Delivery Partner";
+
       tx.update(orderRef, {
         status: "DELIVERED",
         deliveredAt: FieldValue.serverTimestamp(),
+        deliveredById: uid,
+        deliveredByName,
         updatedAt: Date.now(),
       });
 
@@ -731,6 +744,8 @@ exports.markOrderDelivered = onCall(
         ok: true,
         orderId,
         status: "DELIVERED",
+        deliveredById: uid,
+        deliveredByName,
       };
     });
   }

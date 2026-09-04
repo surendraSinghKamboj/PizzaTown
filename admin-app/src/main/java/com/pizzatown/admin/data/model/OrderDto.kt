@@ -21,6 +21,7 @@ data class OrderDto(
     val specialInstructions: String = "", val status: String = "PENDING",
     val createdAt: Long = 0L, val updatedAt: Long = 0L,
     val deliveryLat: Double = 0.0, val deliveryLng: Double = 0.0,
+    val deliveredById: String = "", val deliveredByName: String = "",
     val paymentMethod: String = "COD",
     val paymentStatus: String = "NOT_REQUIRED",
     val cashfreeOrderId: String = "",
@@ -36,6 +37,7 @@ fun OrderDto.toDomain() = Order(
     status = runCatching { OrderStatus.valueOf(status) }.getOrDefault(OrderStatus.PENDING),
     createdAt = createdAt, updatedAt = updatedAt,
     deliveryLat = deliveryLat, deliveryLng = deliveryLng,
+    deliveredById = deliveredById, deliveredByName = deliveredByName,
     paymentMethod = runCatching { PaymentMethod.valueOf(paymentMethod) }.getOrDefault(PaymentMethod.COD),
     paymentStatus = runCatching { PaymentStatus.valueOf(paymentStatus) }.getOrDefault(PaymentStatus.NOT_REQUIRED),
     cashfreeOrderId = cashfreeOrderId, cashfreePaymentId = cashfreePaymentId

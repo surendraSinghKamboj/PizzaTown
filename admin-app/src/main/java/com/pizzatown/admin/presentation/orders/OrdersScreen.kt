@@ -88,6 +88,7 @@ import com.pizzatown.admin.ui.theme.StatusCancelled
 @Composable
 fun OrdersScreen(
     onBack: () -> Unit,
+    onOpenOrder: (String) -> Unit,
     viewModel: OrdersViewModel = hiltViewModel()
 ) {
     val state by viewModel.ordersState.collectAsStateWithLifecycle()
@@ -191,8 +192,7 @@ fun OrdersScreen(
                         items(current.data, key = { it.orderId }) { order ->
                             AdminOrderCard(
                                 order = order,
-                                onAdvance = { viewModel.advanceStatus(order) },
-                                onCancel = { viewModel.cancelOrder(order) },
+                                onOpen = { onOpenOrder(order.orderId) },
                                 modifier = Modifier.animateItem()
                             )
                         }
@@ -206,17 +206,12 @@ fun OrdersScreen(
 @Composable
 private fun AdminOrderCard(
     order: Order,
-    onAdvance: () -> Unit,
-    onCancel: () -> Unit,
+    onOpen: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .animateContentSize(),
+        modifier = modifier.fillMaxWidth(),
+        onClick = onOpen,
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
@@ -224,27 +219,17 @@ private fun AdminOrderCard(
         border = BorderStroke(
             width = 1.dp,
             color = MaterialTheme.colorScheme.outlineVariant
-        ),
-        onClick = {
-            expanded = !expanded
-        }
+        )
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-
-            // ------------------------------------------------
-            // HEADER
-            // ------------------------------------------------
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
             ) {
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "#${shortOrderId(order.orderId)}",
                         style = MaterialTheme.typography.labelLarge,
@@ -270,31 +255,8 @@ private fun AdminOrderCard(
                     )
                 }
 
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    StatusChip(order.status)
-
-                    Icon(
-                        imageVector = if (expanded) {
-                            Icons.Filled.ExpandLess
-                        } else {
-                            Icons.Filled.ExpandMore
-                        },
-                        contentDescription = if (expanded) {
-                            "Collapse order"
-                        } else {
-                            "Expand order"
-                        },
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                StatusChip(order.status)
             }
-
-            // ------------------------------------------------
-            // QUICK SUMMARY
-            // ------------------------------------------------
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -308,10 +270,7 @@ private fun AdminOrderCard(
 
                 Spacer(Modifier.width(8.dp))
 
-                Text(
-                    text = "•",
-                    color = MaterialTheme.colorScheme.outline
-                )
+                Text("•", color = MaterialTheme.colorScheme.outline)
 
                 Spacer(Modifier.width(8.dp))
 
@@ -323,15 +282,16 @@ private fun AdminOrderCard(
 
                 Spacer(Modifier.weight(1f))
 
-                PaymentChip(
-                    order.paymentMethod,
-                    order.paymentStatus
+                PaymentChip(order.paymentMethod, order.paymentStatus)
+
+                Spacer(Modifier.width(8.dp))
+
+                Icon(
+                    imageVector = Icons.Filled.ChevronRight,
+                    contentDescription = "Open order details",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-
-            // ------------------------------------------------
-            // CUSTOMER PREVIEW
-            // ------------------------------------------------
 
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -345,30 +305,12 @@ private fun AdminOrderCard(
                     val phone = order.customer.phone.trim()
 
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .then(
-                                if (phone.isNotBlank()) {
-                                    Modifier.clickable {
-                                        val intent = Intent(
-                                            Intent.ACTION_DIAL,
-                                            Uri.parse("tel:$phone")
-                                        )
-                                        context.startActivity(intent)
-                                    }
-                                } else {
-                                    Modifier
-                                }
-                            ),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            Icons.Filled.Phone,
-                            contentDescription = if (phone.isNotBlank()) {
-                                "Call customer"
-                            } else {
-                                null
-                            },
+                            Icons.Filled.Person,
+                            contentDescription = null,
                             modifier = Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.primary
                         )
@@ -376,22 +318,17 @@ private fun AdminOrderCard(
                         Spacer(Modifier.width(8.dp))
 
                         Text(
-                            text = if (phone.isNotBlank()) {
-                                phone
-                            } else {
-                                "Phone not available"
-                            },
+                            text = order.customer.name.ifBlank { "Customer" },
                             style = MaterialTheme.typography.bodyMedium,
-                            color = if (phone.isNotBlank()) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            fontWeight = if (phone.isNotBlank()) {
-                                FontWeight.SemiBold
-                            } else {
-                                FontWeight.Normal
-                            }
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        Spacer(Modifier.weight(1f))
+
+                        Text(
+                            text = if (phone.isNotBlank()) phone else "Phone unavailable",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -408,282 +345,13 @@ private fun AdminOrderCard(
                         Spacer(Modifier.width(8.dp))
 
                         Text(
-                            text = order.customer.address.ifBlank {
-                                "Address not available"
-                            },
+                            text = order.customer.address.ifBlank { "Address not available" },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = if (expanded) 5 else 2,
+                            maxLines = 2,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
-                    }
-                }
-            }
-
-            // ------------------------------------------------
-            // EXPANDED DETAILS
-            // ------------------------------------------------
-
-            if (expanded) {
-
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
-
-                // CUSTOMER
-                OrderDetailSectionTitle(
-                    title = "Customer",
-                    icon = Icons.Filled.Person
-                )
-
-                DetailRow(
-                    label = "Name",
-                    value = order.customer.name.ifBlank { "—" }
-                )
-
-                DetailRow(
-                    label = "Phone",
-                    value = order.customer.phone.ifBlank { "—" }
-                )
-
-                DetailRow(
-                    label = "Address",
-                    value = order.customer.address.ifBlank { "—" }
-                )
-
-                // ITEMS
-                OrderDetailSectionTitle(
-                    title = "Items",
-                    icon = Icons.Filled.RestaurantMenu
-                )
-
-                if (order.items.isEmpty()) {
-                    Text(
-                        text = "No item details available.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    order.items.forEachIndexed { index, item ->
-
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            color = if (index % 2 == 0) {
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-                            } else {
-                                MaterialTheme.colorScheme.surface
-                            }
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.Top
-                            ) {
-
-                                Column(
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(
-                                        text = item.name,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-
-                                    item.variantName
-                                        ?.takeIf { it.isNotBlank() }
-                                        ?.let {
-                                            Text(
-                                                text = it,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                        }
-
-                                    if (item.customizationNames.isNotEmpty()) {
-                                        Spacer(Modifier.height(3.dp))
-
-                                        Text(
-                                            text = item.customizationNames
-                                                .joinToString(" • "),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-
-                                    Spacer(Modifier.height(5.dp))
-
-                                    Text(
-                                        text = "₹${item.unitPrice.toInt()} × ${item.quantity}",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-
-                                Spacer(Modifier.width(12.dp))
-
-                                Text(
-                                    text = "₹${item.lineTotal.toInt()}",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // BILL SUMMARY
-                OrderDetailSectionTitle(
-                    title = "Bill summary",
-                    icon = Icons.Filled.Payments
-                )
-
-                BillRow("Subtotal", order.subtotal)
-
-                if (order.discount > 0.0) {
-                    BillRow(
-                        label = "Discount",
-                        amount = -order.discount,
-                        valueColor = MaterialTheme.colorScheme.tertiary
-                    )
-                }
-
-                if (order.couponCode.isNotBlank()) {
-                    Text(
-                        text = "Coupon: ${order.couponCode}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                BillRow("Delivery fee", order.deliveryFee)
-                BillRow("Tax", order.tax)
-
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Grand total",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    Text(
-                        text = "₹${order.grandTotal.toInt()}",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                // NOTES
-                if (order.specialInstructions.isNotBlank()) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(
-                            alpha = 0.45f
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp)
-                        ) {
-                            Text(
-                                text = "Special instructions",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-
-                            Spacer(Modifier.height(4.dp))
-
-                            Text(
-                                text = order.specialInstructions,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-                }
-
-                // PAYMENT AUDIT
-                if (
-                    order.paymentMethod == PaymentMethod.ONLINE &&
-                    (
-                        order.cashfreeOrderId.isNotBlank() ||
-                        order.cashfreePaymentId.isNotBlank()
-                    )
-                ) {
-                    OrderDetailSectionTitle(
-                        title = "Payment details",
-                        icon = Icons.Filled.Payments
-                    )
-
-                    if (order.cashfreeOrderId.isNotBlank()) {
-                        DetailRow(
-                            label = "Cashfree order",
-                            value = order.cashfreeOrderId
-                        )
-                    }
-
-                    if (order.cashfreePaymentId.isNotBlank()) {
-                        DetailRow(
-                            label = "Payment ID",
-                            value = order.cashfreePaymentId
-                        )
-                    }
-                }
-
-                // ACTIONS
-                Spacer(Modifier.height(4.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    val next = order.nextStatus()
-
-                    if (next != null) {
-                        Button(
-                            onClick = onAdvance,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text(
-                                "Mark as ${
-                                    next.name
-                                        .lowercase()
-                                        .replaceFirstChar { it.uppercase() }
-                                }"
-                            )
-                        }
-                    }
-
-                    if (order.canCancel()) {
-                        OutlinedButton(
-                            onClick = onCancel,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error
-                            ),
-                            border = BorderStroke(
-                                1.dp,
-                                MaterialTheme.colorScheme.error.copy(
-                                    alpha = 0.45f
-                                )
-                            )
-                        ) {
-                            Text("Cancel Order")
-                        }
                     }
                 }
             }

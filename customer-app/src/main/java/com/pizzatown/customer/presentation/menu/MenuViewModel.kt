@@ -60,6 +60,9 @@ class MenuViewModel @Inject constructor(
     private val _defaultAddress = MutableStateFlow<Address?>(null)
     val defaultAddress: StateFlow<Address?> = _defaultAddress.asStateFlow()
 
+    private val _profileLoaded = MutableStateFlow(false)
+    val profileLoaded: StateFlow<Boolean> = _profileLoaded.asStateFlow()
+
     val restaurantStatus: StateFlow<RestaurantStatus> = settingsRepository.observeRestaurantStatus()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), RestaurantStatus(isOpen = true))
 
@@ -75,13 +78,27 @@ class MenuViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
     init {
+        refreshProfile()
+    }
+
+    fun refreshProfile() {
+        val uid = authRepository.currentUserId ?: return
+
         viewModelScope.launch {
-            authRepository.currentUserId?.let { uid ->
-                profileRepository.getProfile(uid).onSuccess { profile ->
-                    _customerFirstName.value = profile.fullName.trim().substringBefore(" ")
-                    _defaultAddress.value = profile.addresses.find { it.isDefault } ?: profile.addresses.firstOrNull()
+            profileRepository.getProfile(uid)
+                .onSuccess { profile ->
+                    _customerFirstName.value =
+                        profile.fullName.trim().substringBefore(" ")
+
+                    _defaultAddress.value =
+                        profile.addresses.find { it.isDefault }
+                            ?: profile.addresses.firstOrNull()
+
+                    _profileLoaded.value = true
                 }
-            }
+                .onFailure {
+                    _profileLoaded.value = true
+                }
         }
     }
 

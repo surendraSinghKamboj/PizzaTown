@@ -34,6 +34,7 @@ import java.util.Locale
 @Composable
 fun OrderHistoryScreen(
     onBack: () -> Unit,
+    onOpenOrder: (String) -> Unit,
     viewModel: OrderHistoryViewModel = hiltViewModel()
 ) {
     val state by viewModel.ordersState.collectAsStateWithLifecycle()
@@ -124,6 +125,7 @@ fun OrderHistoryScreen(
 
                         OrderCard(
                             order = order,
+                            onOpen = { onOpenOrder(order.orderId) },
                             modifier = Modifier.animateItem()
                         )
                     }
@@ -136,54 +138,34 @@ fun OrderHistoryScreen(
 @Composable
 private fun OrderCard(
     order: Order,
+    onOpen: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var expanded by remember { mutableStateOf(false) }
-
     val statusColor = orderStatusColor(order.status)
 
     Card(
-        onClick = {
-            expanded = !expanded
-        },
-        modifier = modifier
-            .fillMaxWidth()
-            ,
-
+        onClick = onOpen,
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp
-        ),
-
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
         )
     ) {
-
         Column(
             Modifier.padding(16.dp)
         ) {
-
-            // -------------------------------
-            // ORDER HEADER
-            // -------------------------------
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
             ) {
-
                 Surface(
                     shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(
-                        alpha = 0.55f
-                    )
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                 ) {
                     Icon(
                         Icons.Filled.Storefront,
@@ -200,7 +182,6 @@ private fun OrderCard(
                 Column(
                     Modifier.weight(1f)
                 ) {
-
                     Text(
                         "Order #${order.orderId.takeLast(6).uppercase()}",
                         style = MaterialTheme.typography.titleMedium,
@@ -231,7 +212,6 @@ private fun OrderCard(
                 Column(
                     horizontalAlignment = Alignment.End
                 ) {
-
                     OrderStatusBadge(
                         status = order.status,
                         color = statusColor
@@ -240,7 +220,7 @@ private fun OrderCard(
                     Spacer(Modifier.height(7.dp))
 
                     Text(
-                        if (expanded) "Hide details" else "View details",
+                        "View details",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold
@@ -251,9 +231,7 @@ private fun OrderCard(
             Spacer(Modifier.height(12.dp))
 
             HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant.copy(
-                    alpha = 0.55f
-                )
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
             )
 
             Spacer(Modifier.height(11.dp))
@@ -262,241 +240,6 @@ private fun OrderCard(
                 order.paymentMethod,
                 order.paymentStatus
             )
-
-            // -------------------------------
-            // EXPANDED DETAILS
-            // -------------------------------
-
-            if (expanded) {
-
-                Spacer(Modifier.height(14.dp))
-
-                Text(
-                    "Order details",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(Modifier.height(10.dp))
-
-                order.items.forEachIndexed { index, item ->
-
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(
-                            alpha = 0.38f
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-
-                        Row(
-                            Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.Top
-                        ) {
-
-                            Surface(
-                                shape = RoundedCornerShape(9.dp),
-                                color = MaterialTheme.colorScheme.surface
-                            ) {
-                                Text(
-                                    "${item.quantity}×",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(
-                                        horizontal = 9.dp,
-                                        vertical = 7.dp
-                                    )
-                                )
-                            }
-
-                            Spacer(Modifier.width(10.dp))
-
-                            Column(
-                                Modifier.weight(1f)
-                            ) {
-
-                                Text(
-                                    item.name +
-                                        (item.variantName?.let {
-                                            "  •  $it"
-                                        } ?: ""),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-
-                                if (item.customizationNames.isNotEmpty()) {
-
-                                    Spacer(Modifier.height(3.dp))
-
-                                    Text(
-                                        item.customizationNames.joinToString(", "),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-
-                            Spacer(Modifier.width(8.dp))
-
-                            Text(
-                                "₹${item.lineTotal.toInt()}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-
-                    if (index != order.items.lastIndex) {
-                        Spacer(Modifier.height(7.dp))
-                    }
-                }
-
-                if (order.specialInstructions.isNotBlank()) {
-
-                    Spacer(Modifier.height(14.dp))
-
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(
-                            alpha = 0.4f
-                        )
-                    ) {
-                        Column(
-                            Modifier.padding(12.dp)
-                        ) {
-                            Text(
-                                "Special instructions",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            Spacer(Modifier.height(3.dp))
-
-                            Text(
-                                order.specialInstructions,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(14.dp))
-
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(
-                        alpha = 0.32f
-                    )
-                ) {
-                    Row(
-                        Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-
-                        Icon(
-                            Icons.Filled.LocationOn,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-
-                        Spacer(Modifier.width(8.dp))
-
-                        Column {
-                            Text(
-                                "Delivered to",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            Spacer(Modifier.height(2.dp))
-
-                            Text(
-                                order.customer.address,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                // -------------------------------
-                // BILL
-                // -------------------------------
-
-                Text(
-                    "Bill summary",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(Modifier.height(9.dp))
-
-                BillRow(
-                    "Subtotal",
-                    "₹${order.subtotal.toInt()}"
-                )
-
-                if (order.discount > 0) {
-                    Spacer(Modifier.height(5.dp))
-
-                    BillRow(
-                        if (order.couponCode.isNotBlank())
-                            "Discount (${order.couponCode})"
-                        else
-                            "Discount",
-                        "-₹${order.discount.toInt()}",
-                        highlight = true
-                    )
-                }
-
-                if (order.deliveryFee > 0) {
-                    Spacer(Modifier.height(5.dp))
-
-                    BillRow(
-                        "Delivery Fee",
-                        "₹${order.deliveryFee.toInt()}"
-                    )
-                }
-
-                if (order.tax > 0) {
-                    Spacer(Modifier.height(5.dp))
-
-                    BillRow(
-                        "Tax",
-                        "₹${order.tax.toInt()}"
-                    )
-                }
-
-                Spacer(Modifier.height(10.dp))
-
-                HorizontalDivider()
-
-                Spacer(Modifier.height(10.dp))
-
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-
-                    Text(
-                        "Grand Total",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Text(
-                        "₹${order.grandTotal.toInt()}",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
         }
     }
 }

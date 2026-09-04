@@ -20,6 +20,7 @@ import com.pizzatown.admin.presentation.menu.MenuListScreen
 import com.pizzatown.admin.presentation.offers.OfferEditorScreen
 import com.pizzatown.admin.presentation.offers.OffersListScreen
 import com.pizzatown.admin.presentation.orders.OrdersScreen
+import com.pizzatown.admin.presentation.orders.OrderDetailsScreen
 import com.pizzatown.admin.presentation.profile.ProfileScreen
 import com.pizzatown.admin.presentation.settings.ShopSettingsScreen
 import com.pizzatown.admin.ui.theme.AppearancePreferences
@@ -113,6 +114,27 @@ fun AdminNavGraph(
 
         composable(AdminDestinations.ORDERS) {
             OrdersScreen(
+                onBack = { navController.popBackStack() },
+                onOpenOrder = { orderId ->
+                    navController.navigate(
+                        AdminDestinations.orderDetailsRoute(orderId)
+                    )
+                }
+            )
+        }
+
+        composable(
+            route = "${AdminDestinations.ORDER_DETAILS}?${AdminDestinations.ORDER_DETAILS_ARG_ID}={${AdminDestinations.ORDER_DETAILS_ARG_ID}}",
+            arguments = listOf(
+                navArgument(AdminDestinations.ORDER_DETAILS_ARG_ID) {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            OrderDetailsScreen(
+                orderId = backStackEntry.arguments?.getString(
+                    AdminDestinations.ORDER_DETAILS_ARG_ID
+                ).orEmpty(),
                 onBack = { navController.popBackStack() }
             )
         }
