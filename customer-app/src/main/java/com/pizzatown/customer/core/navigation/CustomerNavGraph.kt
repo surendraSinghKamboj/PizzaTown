@@ -18,6 +18,7 @@ import com.pizzatown.customer.presentation.menu.MenuItemDetailsScreen
 import com.pizzatown.customer.presentation.menu.MenuScreen
 import com.pizzatown.customer.presentation.notifications.NotificationInboxScreen
 import com.pizzatown.customer.presentation.orders.OrderHistoryScreen
+import com.pizzatown.customer.presentation.orders.OrderDetailsScreen
 import com.pizzatown.customer.presentation.orders.OrderPlacedScreen
 import com.pizzatown.customer.presentation.profile.ProfileScreen
 import com.pizzatown.customer.presentation.splash.SplashScreen
@@ -104,6 +105,11 @@ fun CustomerNavGraph(navController: NavHostController) {
                         launchSingleTop = true
                     }
                 },
+                onOpenAddAddress = {
+                    navController.navigate(
+                        CustomerDestinations.PROFILE_ADD_ADDRESS
+                    )
+                },
                 onOpenOrderHistory = { navController.navigate(CustomerDestinations.ORDER_HISTORY) },
                 onLoggedOut = {
                     navController.navigate(CustomerDestinations.LOGIN) {
@@ -157,7 +163,27 @@ fun CustomerNavGraph(navController: NavHostController) {
                         popUpTo(0) { inclusive = true }
                     }
                 },
-                onViewOrders = { navController.navigate(CustomerDestinations.ORDER_HISTORY) }
+                onViewOrders = {
+                    navController.navigate(CustomerDestinations.ORDER_HISTORY)
+                }
+            )
+        }
+
+        composable(
+            CustomerDestinations.PROFILE_ADD_ADDRESS,
+            enterTransition = fadeInSlow,
+            exitTransition = fadeOutSlow
+        ) {
+            ProfileScreen(
+                openAddressManager = true,
+                onLoggedOut = {
+                    navController.navigate(CustomerDestinations.LOGIN) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
+                onViewOrders = {
+                    navController.navigate(CustomerDestinations.ORDER_HISTORY)
+                }
             )
         }
 
@@ -208,6 +234,33 @@ fun CustomerNavGraph(navController: NavHostController) {
             popExitTransition = { ExitTransition.None }
         ) {
             OrderHistoryScreen(
+                onBack = {
+                    navController.popBackStack()
+                },
+                onOpenOrder = { orderId ->
+                    navController.navigate(
+                        CustomerDestinations.orderDetailsRoute(orderId)
+                    )
+                }
+            )
+        }
+
+        composable(
+            route = CustomerDestinations.ORDER_DETAILS,
+            arguments = listOf(
+                navArgument(CustomerDestinations.ORDER_DETAILS_ARG_ID) {
+                    type = NavType.StringType
+                }
+            ),
+            enterTransition = slideInFromRight,
+            exitTransition = slideOutToLeft,
+            popEnterTransition = slideInFromLeft,
+            popExitTransition = slideOutToRight
+        ) { backStackEntry ->
+            OrderDetailsScreen(
+                orderId = backStackEntry.arguments?.getString(
+                    CustomerDestinations.ORDER_DETAILS_ARG_ID
+                ).orEmpty(),
                 onBack = {
                     navController.popBackStack()
                 }

@@ -54,35 +54,28 @@ class ProfileViewModel @Inject constructor(
     // newer "Set as default" selection.
     private val profileWriteMutex = Mutex()
 
-    // Prevent an older asynchronous profile load from overwriting a newer write.
-    private var profileRevision = 0L
-
     init { load() }
 
     private fun load() {
         val uid = userId ?: return
-        val requestedRevision = profileRevision
 
         viewModelScope.launch {
-            profileRepository.getProfile(uid)
-                .onSuccess { profile ->
-                    // Ignore a response that was started before a newer
-                    // local profile/address write.
-                    if (requestedRevision != profileRevision) return@onSuccess
-
-                    _profileState.value = UiState.Success(profile)
-                    _editState.value = ProfileEditState(
-                        profile.fullName,
-                        profile.mobile,
-                        dateOfBirth = profile.dateOfBirth,
-                        anniversaryDate = profile.anniversaryDate
-                    )
-                }
-                .onFailure {
-                    if (requestedRevision != profileRevision) return@onFailure
-                    _profileState.value =
-                        UiState.Error(it.message ?: "Unable to load profile.")
-                }
+            profileWriteMutex.withLock {
+                profileRepository.getProfile(uid)
+                    .onSuccess { profile ->
+                        _profileState.value = UiState.Success(profile)
+                        _editState.value = ProfileEditState(
+                            profile.fullName,
+                            profile.mobile,
+                            dateOfBirth = profile.dateOfBirth,
+                            anniversaryDate = profile.anniversaryDate
+                        )
+                    }
+                    .onFailure {
+                        _profileState.value =
+                            UiState.Error(it.message ?: "Unable to load profile.")
+                    }
+            }
         }
     }
 
@@ -342,35 +335,29 @@ class ProfileViewModel @Inject constructor(
                     return@withLock
                 }
 
-                // This is a newer profile state. Any older load() response
-                // must no longer be allowed to overwrite it.
-                profileRevision++
-
                 val updatedProfile = current.copy(
                     addresses = current.addresses.map { address ->
                         address.copy(isDefault = address.id == addressId)
                     }
                 )
 
-                // Reflect the selection immediately.
+                // Show the selected address immediately.
                 _profileState.value = UiState.Success(updatedProfile)
 
-                // Use the Firestore transaction so the server reads the
-                // latest addresses and atomically makes exactly one default.
                 profileRepository
                     .setDefaultAddress(
                         userId = uid,
                         addressId = addressId
                     )
                     .onFailure { error ->
+                        // Revert only if the authoritative Firestore write failed.
+                        _profileState.value = UiState.Success(current)
+
                         Log.e(
                             "PizzaTownAddress",
                             "Failed to persist default address id=$addressId",
                             error
                         )
-
-                        // Only revert because the authoritative write failed.
-                        _profileState.value = UiState.Success(current)
                     }
             }
         }
@@ -380,7 +367,6 @@ class ProfileViewModel @Inject constructor(
         current: UserProfile,
         addresses: List<Address>
     ) {
-        profileRevision++
         val updatedProfile = current.copy(
             addresses = addresses
         )

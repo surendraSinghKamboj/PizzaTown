@@ -31,6 +31,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.pizzatown.customer.R
 import com.pizzatown.customer.core.common.UiState
@@ -70,6 +73,7 @@ fun MenuScreen(
     onItemClick: (String) -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenProfile: () -> Unit = {},
+    onOpenAddAddress: () -> Unit = {},
     onOpenOrderHistory: () -> Unit = {},
     onLoggedOut: () -> Unit = {},
     viewModel: MenuViewModel = hiltViewModel(),
@@ -82,7 +86,24 @@ fun MenuScreen(
     val unreadCount by notificationViewModel.unreadCount.collectAsStateWithLifecycle()
     val firstName by viewModel.customerFirstName.collectAsStateWithLifecycle()
     val defaultAddress by viewModel.defaultAddress.collectAsStateWithLifecycle()
+    val profileLoaded by viewModel.profileLoaded.collectAsStateWithLifecycle()
     val restaurantStatus by viewModel.restaurantStatus.collectAsStateWithLifecycle()
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshProfile()
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     val cartQuantities by viewModel.simpleCartQuantities.collectAsStateWithLifecycle()
     val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
 
@@ -134,8 +155,17 @@ fun MenuScreen(
             fullWidth {
                 DeliveryAddressBar(
                     label = defaultAddress?.label.orEmpty(),
-                    addressLine = defaultAddress?.fullAddress?.takeIf { it.isNotBlank() } ?: "Add a delivery address",
-                    onClick = onOpenProfile
+                    addressLine =
+                        defaultAddress?.fullAddress?.takeIf {
+                            it.isNotBlank()
+                        } ?: "Add a delivery address",
+                    onClick = {
+                        if (profileLoaded && defaultAddress == null) {
+                            onOpenAddAddress()
+                        } else {
+                            onOpenProfile()
+                        }
+                    }
                 )
             }
 

@@ -39,10 +39,17 @@ import com.pizzatown.customer.presentation.address.AddressManagerScreen
 fun ProfileScreen(
     onLoggedOut: () -> Unit,
     onViewOrders: () -> Unit,
+    openAddressManager: Boolean = false,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     var showAddressManager by remember {
-        mutableStateOf(false)
+        mutableStateOf(openAddressManager)
+    }
+
+    LaunchedEffect(openAddressManager) {
+        if (openAddressManager) {
+            showAddressManager = true
+        }
     }
 
     var editingAddress by remember {

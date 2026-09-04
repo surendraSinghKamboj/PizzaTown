@@ -9,6 +9,7 @@ import com.pizzatown.delivery.core.location.DeliveryLocationService
 import com.pizzatown.delivery.core.notifications.DeliveryNotificationRegistrar
 
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -196,6 +197,16 @@ class MainActivity : ComponentActivity() {
             DeliveryTheme(
                 darkTheme = darkTheme
             ) {
+                SideEffect {
+                    WindowCompat.getInsetsController(
+                        window,
+                        window.decorView
+                    ).apply {
+                        isAppearanceLightStatusBars = !darkTheme
+                        isAppearanceLightNavigationBars = !darkTheme
+                    }
+                }
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

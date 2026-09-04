@@ -51,6 +51,8 @@ data class Order(
     val updatedAt: Long = 0L,
     val deliveryLat: Double = 0.0,
     val deliveryLng: Double = 0.0,
+    val deliveredById: String = "",
+    val deliveredByName: String = "",
     val paymentMethod: PaymentMethod = PaymentMethod.COD,
     val paymentStatus: PaymentStatus = PaymentStatus.NOT_REQUIRED,
     val cashfreeOrderId: String = "",

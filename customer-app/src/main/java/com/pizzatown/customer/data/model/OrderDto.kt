@@ -21,6 +21,8 @@ data class OrderDto(
     val specialInstructions: String = "", val status: String = "PENDING",
     val createdAt: Long = 0L, val updatedAt: Long = 0L,
     val deliveryLat: Double = 0.0, val deliveryLng: Double = 0.0,
+    val deliveredById: String = "",
+    val deliveredByName: String = "",
     // Payment fields. Defaults here (COD / NOT_REQUIRED) only matter for
     // pre-payment-integration legacy documents that predate these fields —
     // every order created going forward always writes them explicitly.
@@ -38,6 +40,7 @@ fun Order.toDto() = OrderDto(
     totalItems = totalItems, specialInstructions = specialInstructions, status = status.name,
     createdAt = createdAt, updatedAt = updatedAt,
     deliveryLat = deliveryLat, deliveryLng = deliveryLng,
+    deliveredById = deliveredById, deliveredByName = deliveredByName,
     paymentMethod = paymentMethod.name, paymentStatus = paymentStatus.name,
     cashfreeOrderId = cashfreeOrderId, cashfreePaymentId = cashfreePaymentId
 )
@@ -52,6 +55,7 @@ fun OrderDto.toDomain() = Order(
         .getOrDefault(OrderStatus.PENDING),
     createdAt = createdAt, updatedAt = updatedAt,
     deliveryLat = deliveryLat, deliveryLng = deliveryLng,
+    deliveredById = deliveredById, deliveredByName = deliveredByName,
     paymentMethod = runCatching { PaymentMethod.valueOf(paymentMethod) }.getOrDefault(PaymentMethod.COD),
     paymentStatus = runCatching { PaymentStatus.valueOf(paymentStatus) }.getOrDefault(PaymentStatus.NOT_REQUIRED),
     cashfreeOrderId = cashfreeOrderId, cashfreePaymentId = cashfreePaymentId

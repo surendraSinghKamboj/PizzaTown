@@ -1,186 +1,4 @@
-cd ~/Desktop/project_updated/PizzaTown_FULL_v2_Home && \
-cp ./customer-app/src/main/java/com/pizzatown/customer/presentation/orders/OrderHistoryScreen.kt \
-   ./customer-app/src/main/java/com/pizzatown/customer/presentation/orders/OrderHistoryScreen.kt.backup_before_details_$(date +%Y%m%d_%H%M%S) && \
-cp ./customer-app/src/main/java/com/pizzatown/customer/core/navigation/CustomerDestinations.kt \
-   ./customer-app/src/main/java/com/pizzatown/customer/core/navigation/CustomerDestinations.kt.backup_before_details_$(date +%Y%m%d_%H%M%S) && \
-cp ./customer-app/src/main/java/com/pizzatown/customer/core/navigation/CustomerNavGraph.kt \
-   ./customer-app/src/main/java/com/pizzatown/customer/core/navigation/CustomerNavGraph.kt.backup_before_details_$(date +%Y%m%d_%H%M%S) && \
-python3 - <<'PY'
-from pathlib import Path
-
-root = Path(".")
-orders = root / "customer-app/src/main/java/com/pizzatown/customer/presentation/orders/OrderHistoryScreen.kt"
-dest = root / "customer-app/src/main/java/com/pizzatown/customer/core/navigation/CustomerDestinations.kt"
-nav = root / "customer-app/src/main/java/com/pizzatown/customer/core/navigation/CustomerNavGraph.kt"
-details = root / "customer-app/src/main/java/com/pizzatown/customer/presentation/orders/OrderDetailsScreen.kt"
-
-# ---------- ORDER HISTORY ----------
-s = orders.read_text()
-
-if "onOpenOrder: (String) -> Unit" not in s:
-    s = s.replace(
-        '''fun OrderHistoryScreen(
-    onBack: () -> Unit,
-    viewModel: OrderHistoryViewModel = hiltViewModel()
-)''',
-        '''fun OrderHistoryScreen(
-    onBack: () -> Unit,
-    onOpenOrder: (String) -> Unit,
-    viewModel: OrderHistoryViewModel = hiltViewModel()
-)'''
-    )
-
-old_call = '''OrderCard(
-                            order = order,
-                            modifier = Modifier.animateItem()
-                        )'''
-new_call = '''OrderCard(
-                            order = order,
-                            onOpen = { onOpenOrder(order.orderId) },
-                            modifier = Modifier.animateItem()
-                        )'''
-if old_call not in s:
-    raise SystemExit("PATCH FAILED: OrderCard call anchor not found")
-s = s.replace(old_call, new_call)
-
-start = s.find("@Composable\nprivate fun OrderCard(")
-end = s.find("@Composable\nprivate fun OrderStatusBadge(", start)
-if start < 0 or end < 0:
-    raise SystemExit("PATCH FAILED: OrderCard block boundaries not found")
-
-card = '''@Composable
-private fun OrderCard(
-    order: Order,
-    onOpen: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val statusColor = orderStatusColor(order.status)
-
-    Card(
-        onClick = onOpen,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-        )
-    ) {
-        Column(
-            Modifier.padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                ) {
-                    Icon(
-                        Icons.Filled.Storefront,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .size(46.dp)
-                            .padding(11.dp)
-                    )
-                }
-
-                Spacer(Modifier.width(12.dp))
-
-                Column(
-                    Modifier.weight(1f)
-                ) {
-                    Text(
-                        "Order #${order.orderId.takeLast(6).uppercase()}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(Modifier.height(3.dp))
-
-                    Text(
-                        formatDate(order.createdAt),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Spacer(Modifier.height(5.dp))
-
-                    Text(
-                        "${order.totalItems} item" +
-                            if (order.totalItems == 1) "" else "s" +
-                            "  •  ₹${order.grandTotal.toInt()}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                Spacer(Modifier.width(8.dp))
-
-                Column(
-                    horizontalAlignment = Alignment.End
-                ) {
-                    OrderStatusBadge(
-                        status = order.status,
-                        color = statusColor
-                    )
-
-                    Spacer(Modifier.height(7.dp))
-
-                    Text(
-                        "View details",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-            )
-
-            Spacer(Modifier.height(11.dp))
-
-            PaymentLabel(
-                order.paymentMethod,
-                order.paymentStatus
-            )
-        }
-    }
-}
-
-'''
-s = s[:start] + card + s[end:]
-orders.write_text(s)
-
-# ---------- DESTINATIONS ----------
-s = dest.read_text()
-if "const val ORDER_DETAILS" not in s:
-    s = s.replace(
-        'const val ORDER_HISTORY = "order_history"\n',
-        'const val ORDER_HISTORY = "order_history"\n'
-        '    const val ORDER_DETAILS_ARG_ID = "orderId"\n'
-        '    const val ORDER_DETAILS = "order_details/{$ORDER_DETAILS_ARG_ID}"\n'
-    )
-    helper_anchor = 'fun itemDetailsRoute(itemId: String) = "item_details/$itemId"\n'
-    helper = (
-        'fun orderDetailsRoute(orderId: String) = "order_details/$orderId"\n'
-    )
-    if helper_anchor not in s:
-        raise SystemExit("PATCH FAILED: item route helper anchor not found")
-    s = s.replace(helper_anchor, helper + helper_anchor)
-dest.write_text(s)
-
-# ---------- NEW DETAILS SCREEN ----------
-details.write_text(r'''package com.pizzatown.customer.presentation.orders
+package com.pizzatown.customer.presentation.orders
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -259,21 +77,21 @@ fun OrderDetailsScreen(
         }
     ) { padding ->
         when (val current = state) {
-            is UiState.Loading -> LoadingView(Modifier.padding(padding))
+            is UiState.Loading -> LoadingView(modifier = Modifier.padding(padding))
             is UiState.Error -> ErrorView(
                 current.message,
-                Modifier.padding(padding)
+                modifier = Modifier.padding(padding)
             )
             is UiState.Empty -> ErrorView(
                 "Order not found.",
-                Modifier.padding(padding)
+                modifier = Modifier.padding(padding)
             )
             is UiState.Success -> {
                 val order = current.data.firstOrNull { it.orderId == orderId }
                 if (order == null) {
                     ErrorView(
                         "Order not found.",
-                        Modifier.padding(padding)
+                        modifier = Modifier.padding(padding)
                     )
                 } else {
                     OrderDetailsContent(
@@ -688,91 +506,3 @@ private fun formatDate(epochMillis: Long): String {
         Locale.getDefault()
     ).format(Date(epochMillis))
 }
-''')
-
-# ---------- NAV GRAPH ----------
-s = nav.read_text()
-
-if "import com.pizzatown.customer.presentation.orders.OrderDetailsScreen" not in s:
-    s = s.replace(
-        "import com.pizzatown.customer.presentation.orders.OrderHistoryScreen\n",
-        "import com.pizzatown.customer.presentation.orders.OrderHistoryScreen\n"
-        "import com.pizzatown.customer.presentation.orders.OrderDetailsScreen\n"
-    )
-
-old_route = '''composable(
-            route = CustomerDestinations.ORDER_HISTORY,
-            enterTransition = { EnterTransition.None },
-            exitTransition = { ExitTransition.None },
-            popEnterTransition = { EnterTransition.None },
-            popExitTransition = { ExitTransition.None }
-        ) {
-            OrderHistoryScreen(
-                onBack = {
-                    navController.popBackStack()
-                }
-            )
-        }'''
-new_route = '''composable(
-            route = CustomerDestinations.ORDER_HISTORY,
-            enterTransition = { EnterTransition.None },
-            exitTransition = { ExitTransition.None },
-            popEnterTransition = { EnterTransition.None },
-            popExitTransition = { ExitTransition.None }
-        ) {
-            OrderHistoryScreen(
-                onBack = {
-                    navController.popBackStack()
-                },
-                onOpenOrder = { orderId ->
-                    navController.navigate(
-                        CustomerDestinations.orderDetailsRoute(orderId)
-                    )
-                }
-            )
-        }
-
-        composable(
-            route = CustomerDestinations.ORDER_DETAILS,
-            arguments = listOf(
-                navArgument(CustomerDestinations.ORDER_DETAILS_ARG_ID) {
-                    type = NavType.StringType
-                }
-            ),
-            enterTransition = slideInFromRight,
-            exitTransition = slideOutToLeft,
-            popEnterTransition = slideInFromLeft,
-            popExitTransition = slideOutToRight
-        ) { backStackEntry ->
-            OrderDetailsScreen(
-                orderId = backStackEntry.arguments?.getString(
-                    CustomerDestinations.ORDER_DETAILS_ARG_ID
-                ).orEmpty(),
-                onBack = {
-                    navController.popBackStack()
-                }
-            )
-        }'''
-if old_route not in s:
-    raise SystemExit("PATCH FAILED: Customer ORDER_HISTORY navigation anchor not found")
-
-s = s.replace(old_route, new_route)
-nav.write_text(s)
-
-print("===== CUSTOMER DETAILS PATCH APPLIED =====")
-print("Orders list -> dedicated Order Details page")
-print("Expanded order details removed from list")
-print("Delivered by retained on details page")
-PY
-
-echo '===== VERIFY =====' && \
-grep -nE 'ORDER_DETAILS|orderDetailsRoute' \
-  ./customer-app/src/main/java/com/pizzatown/customer/core/navigation/CustomerDestinations.kt && \
-grep -nE 'OrderDetailsScreen|onOpenOrder|OrderCard' \
-  ./customer-app/src/main/java/com/pizzatown/customer/core/navigation/CustomerNavGraph.kt \
-  ./customer-app/src/main/java/com/pizzatown/customer/presentation/orders/OrderHistoryScreen.kt | head -80 && \
-grep -nE 'expanded|Hide details|View details|Delivered by|deliveredByName' \
-  ./customer-app/src/main/java/com/pizzatown/customer/presentation/orders/OrderHistoryScreen.kt \
-  ./customer-app/src/main/java/com/pizzatown/customer/presentation/orders/OrderDetailsScreen.kt | head -120 && \
-echo '===== BUILD =====' && \
-./gradlew :customer-app:assembleDebug

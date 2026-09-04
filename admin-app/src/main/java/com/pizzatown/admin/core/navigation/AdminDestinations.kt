@@ -6,6 +6,8 @@ object AdminDestinations {
     const val CATEGORIES = "categories"
     const val MENU_LIST = "menu_list"
     const val ORDERS = "orders"
+    const val ORDER_DETAILS = "order_details"
+    const val ORDER_DETAILS_ARG_ID = "orderId"
     const val MENU_EDITOR = "menu_editor"
     const val MENU_EDITOR_ARG_ID = "itemId"
     const val MENU_EDITOR_NEW = "menu_editor?$MENU_EDITOR_ARG_ID=new"
@@ -25,6 +27,8 @@ object AdminDestinations {
 
     const val PROFILE = "profile"
 
-    fun menuEditorRoute(itemId: String) = "menu_editor?$MENU_EDITOR_ARG_ID=$itemId"
+    fun orderDetailsRoute(orderId: String) = "order_details?$ORDER_DETAILS_ARG_ID=${java.net.URLEncoder.encode(orderId, "UTF-8")}"
+
+fun menuEditorRoute(itemId: String) = "menu_editor?$MENU_EDITOR_ARG_ID=$itemId"
     fun offerEditorRoute(offerId: String) = "offer_editor?$OFFER_EDITOR_ARG_ID=$offerId"
 }
